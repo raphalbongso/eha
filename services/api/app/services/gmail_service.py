@@ -143,6 +143,81 @@ class GmailService:
             ),
         )
 
+    async def get_thread(
+        self,
+        encrypted_access_token: bytes,
+        encrypted_refresh_token: bytes,
+        thread_id: str,
+    ) -> dict[str, Any]:
+        """Fetch an entire thread by ID with full message payloads."""
+        creds = self._get_credentials(encrypted_access_token, encrypted_refresh_token)
+        service = self._build_service(creds)
+
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+
+        return await loop.run_in_executor(
+            None,
+            lambda: (
+                service.users()
+                .threads()
+                .get(
+                    userId="me",
+                    id=thread_id,
+                    format="full",
+                )
+                .execute()
+            ),
+        )
+
+    async def list_sent_messages(
+        self,
+        encrypted_access_token: bytes,
+        encrypted_refresh_token: bytes,
+        max_results: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Fetch recent sent messages for style detection."""
+        creds = self._get_credentials(encrypted_access_token, encrypted_refresh_token)
+        service = self._build_service(creds)
+
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+
+        # List message IDs from SENT label
+        list_response = await loop.run_in_executor(
+            None,
+            lambda: (
+                service.users()
+                .messages()
+                .list(
+                    userId="me",
+                    labelIds=["SENT"],
+                    maxResults=max_results,
+                )
+                .execute()
+            ),
+        )
+
+        message_ids = [m["id"] for m in list_response.get("messages", [])]
+
+        # Fetch full messages
+        messages: list[dict[str, Any]] = []
+        for mid in message_ids:
+            msg = await loop.run_in_executor(
+                None,
+                lambda m=mid: (
+                    service.users()
+                    .messages()
+                    .get(userId="me", id=m, format="full")
+                    .execute()
+                ),
+            )
+            messages.append(msg)
+
+        return messages
+
     async def create_draft(
         self,
         encrypted_access_token: bytes,
