@@ -79,34 +79,38 @@ class PushService:
         body: str,
         data: dict[str, str] | None = None,
     ) -> bool:
-        """Send a push notification via APNs."""
+        """Send a push notification via APNs using aioapns."""
         if not self._settings.apns_key_path:
             logger.warning("APNs not configured; skipping push")
             return False
 
         try:
-            from apns2.client import APNsClient, NotificationPriority
-            from apns2.payload import Payload
+            from aioapns import APNs, NotificationRequest
 
-            payload = Payload(alert={"title": title, "body": body}, custom=data or {})
-            client = APNsClient(
-                self._settings.apns_key_path,
-                use_sandbox=self._settings.app_env != "production",
+            if self._apns_client is None:
+                self._apns_client = APNs(
+                    key=self._settings.apns_key_path,
+                    key_id=self._settings.apns_key_id,
+                    team_id=self._settings.apns_team_id,
+                    topic=self._settings.apns_bundle_id,
+                    use_sandbox=self._settings.app_env != "production",
+                )
+
+            request = NotificationRequest(
+                device_token=token,
+                message={
+                    "aps": {"alert": {"title": title, "body": body}},
+                    **(data or {}),
+                },
             )
 
-            import asyncio
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: client.send_notification(
-                    token,
-                    payload,
-                    self._settings.apns_bundle_id,
-                    priority=NotificationPriority.Immediate,
-                ),
-            )
-            logger.info("APNs sent to token=%s...", token[:8])
-            return True
+            response = await self._apns_client.send_notification(request)
+            if response.is_successful:
+                logger.info("APNs sent to token=%s...", token[:8])
+                return True
+            else:
+                logger.error("APNs failed: %s %s", response.status, response.description)
+                return False
         except Exception as e:
             logger.error("APNs send failed: %s", e)
             return False
