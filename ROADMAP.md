@@ -30,17 +30,17 @@
 ## v2.0 — Intelligence & Travel
 
 ### Route-Based Leave Reminders
-- [ ] Google Maps / Apple Maps integration via RouteProvider
-- [ ] Travel time calculation between home/work and event location
-- [ ] "Time to leave" push notifications with traffic-aware timing
-- [ ] User preference for transport mode (driving, transit, cycling, walking)
-- [ ] Home and work address configuration
+- [x] Google Maps / Apple Maps integration via RouteProvider
+- [x] Travel time calculation between home/work and event location
+- [x] "Time to leave" push notifications with traffic-aware timing
+- [x] User preference for transport mode (driving, transit, cycling, walking)
+- [x] Home and work address configuration
 
 ### Enhanced AI
-- [ ] Smart reply suggestions based on user's writing style
-- [ ] Thread context awareness (multi-email conversations)
-- [ ] Priority inbox scoring using ML
-- [ ] Email categorization (invoices, meetings, newsletters, action-required)
+- [x] Smart reply suggestions based on user's writing style
+- [x] Thread context awareness (multi-email conversations)
+- [x] Priority inbox scoring (heuristic + AI-assisted)
+- [x] Email categorization (invoices, meetings, newsletters, action-required)
 
 ### Data & Privacy
 - [ ] Full data export endpoint (GDPR Article 20)
