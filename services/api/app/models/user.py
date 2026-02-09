@@ -27,6 +27,9 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         "DeviceToken", back_populates="user", cascade="all, delete-orphan"
     )
     audit_logs: Mapped[list["AuditLog"]] = relationship("AuditLog", back_populates="user", cascade="all, delete-orphan")
+    preferences: Mapped["UserPreference | None"] = relationship(
+        "UserPreference", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User {self.email}>"

@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     # Gmail polling fallback interval (seconds)
     gmail_poll_interval: int = 60
 
+    # Google Maps (v2)
+    google_maps_api_key: SecretStr = SecretStr("")
+
     @field_validator("allowed_origins")
     @classmethod
     def parse_origins(cls, v: str) -> str:

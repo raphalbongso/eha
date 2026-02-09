@@ -19,7 +19,7 @@ class RuleCondition(BaseModel):
 
 class RuleConditions(BaseModel):
     logic: Literal["AND", "OR"] = "AND"
-    conditions: list[RuleCondition] = Field(..., min_length=1)
+    conditions: list[RuleCondition] = Field(..., min_length=1, max_length=20)
 
 
 class RuleCreate(BaseModel):

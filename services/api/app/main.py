@@ -3,15 +3,17 @@
 import logging
 from contextlib import asynccontextmanager
 
+import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.config import Settings, get_settings
-from app.dependencies import init_db, shutdown_db
+from app.dependencies import get_session_factory, init_db, shutdown_db
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.logging import LoggingMiddleware, setup_logging
 from app.middleware.rate_limit import RateLimitMiddleware
-from app.routers import admin, ai, alerts, auth, devices, drafts, events, gmail, rules
+from app.routers import admin, ai, alerts, auth, devices, drafts, events, gmail, preferences, rules
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +57,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept"],
+        max_age=600,
     )
 
     # Routers
@@ -69,18 +72,49 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(drafts.router, prefix=prefix)
     app.include_router(devices.router, prefix=prefix)
     app.include_router(events.router, prefix=prefix)
+    app.include_router(preferences.router, prefix=prefix)
     app.include_router(admin.router, prefix=prefix)
 
     @app.get("/health")
     async def health():
         return {"status": "ok", "service": "eha-api"}
 
+    @app.get("/health/ready")
+    async def health_ready():
+        """Deep health check: verifies DB and Redis connectivity."""
+        checks: dict = {}
+
+        # Check PostgreSQL
+        try:
+            factory = get_session_factory()
+            async with factory() as session:
+                await session.execute(text("SELECT 1"))
+            checks["database"] = "ok"
+        except Exception as e:
+            checks["database"] = f"error: {type(e).__name__}"
+
+        # Check Redis
+        try:
+            r = aioredis.from_url(settings.redis_url, decode_responses=True)
+            await r.ping()
+            await r.aclose()
+            checks["redis"] = "ok"
+        except Exception as e:
+            checks["redis"] = f"error: {type(e).__name__}"
+
+        all_ok = all(v == "ok" for v in checks.values())
+        status_code = 200 if all_ok else 503
+
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=status_code,
+            content={"status": "ready" if all_ok else "degraded", "checks": checks},
+        )
+
     @app.get("/metrics")
     async def metrics():
-        """Prometheus-compatible metrics endpoint stub.
-
-        In production, integrate with prometheus_fastapi_instrumentator.
-        """
+        """Prometheus-compatible metrics endpoint stub."""
         return {"status": "ok", "detail": "Metrics endpoint - integrate prometheus_fastapi_instrumentator"}
 
     return app

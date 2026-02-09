@@ -1,6 +1,6 @@
 """Alert schemas."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AlertResponse(BaseModel):
@@ -19,4 +19,4 @@ class AlertResponse(BaseModel):
 
 
 class AlertMarkReadRequest(BaseModel):
-    alert_ids: list[str]
+    alert_ids: list[str] = Field(..., min_length=1, max_length=100)

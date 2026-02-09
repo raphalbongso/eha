@@ -1,11 +1,15 @@
 """Authentication routes: Google OAuth PKCE flow + JWT session tokens."""
 
+import base64
 import hashlib
+import json
 import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException
 from jose import jwt
 from sqlalchemy import select
@@ -27,9 +31,6 @@ from app.services.crypto_service import get_crypto_service
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# In-memory state store for PKCE (use Redis in production)
-_pending_states: dict[str, dict] = {}
-
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
@@ -42,6 +43,38 @@ SCOPES = [
     "email",
     "profile",
 ]
+
+# PKCE state TTL: 10 minutes
+_PKCE_STATE_TTL = 600
+_redis_client: aioredis.Redis | None = None
+
+
+async def _get_redis(settings: Settings) -> aioredis.Redis:
+    global _redis_client
+    if _redis_client is None:
+        _redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
+    return _redis_client
+
+
+async def _store_pkce_state(state: str, data: dict, settings: Settings) -> None:
+    """Store PKCE state in Redis with TTL."""
+    r = await _get_redis(settings)
+    key = f"pkce:{state}"
+    await r.set(key, json.dumps(data), ex=_PKCE_STATE_TTL)
+
+
+async def _pop_pkce_state(state: str, settings: Settings) -> dict | None:
+    """Atomically retrieve and delete PKCE state from Redis."""
+    r = await _get_redis(settings)
+    key = f"pkce:{state}"
+    pipe = r.pipeline()
+    pipe.get(key)
+    pipe.delete(key)
+    results = await pipe.execute()
+    raw = results[0]
+    if raw is None:
+        return None
+    return json.loads(raw)
 
 
 def _create_jwt(
@@ -71,16 +104,15 @@ async def google_auth_start(settings: Settings = Depends(get_settings)):
     state = secrets.token_urlsafe(32)
     code_verifier = secrets.token_urlsafe(64)
 
-    # Store state → code_verifier mapping
-    _pending_states[state] = {
-        "code_verifier": code_verifier,
-        "created_at": datetime.now(timezone.utc),
-    }
+    # Store state → code_verifier in Redis
+    await _store_pkce_state(
+        state,
+        {"code_verifier": code_verifier, "created_at": datetime.now(timezone.utc).isoformat()},
+        settings,
+    )
 
     # Build code_challenge (S256)
     code_challenge = hashlib.sha256(code_verifier.encode("ascii")).digest()
-    import base64
-
     code_challenge_b64 = base64.urlsafe_b64encode(code_challenge).rstrip(b"=").decode("ascii")
 
     params = {
@@ -94,8 +126,6 @@ async def google_auth_start(settings: Settings = Depends(get_settings)):
         "access_type": "offline",
         "prompt": "consent",
     }
-
-    from urllib.parse import urlencode
 
     auth_url = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
 
@@ -111,8 +141,8 @@ async def google_auth_callback(
     """Exchange authorization code for tokens. Creates/updates user."""
     import httpx
 
-    # Verify state
-    pending = _pending_states.pop(body.state, None)
+    # Verify state from Redis (atomic pop)
+    pending = await _pop_pkce_state(body.state, settings)
     if not pending:
         raise HTTPException(status_code=400, detail="Invalid or expired state")
 

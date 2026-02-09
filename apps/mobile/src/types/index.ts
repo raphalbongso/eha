@@ -111,6 +111,15 @@ export interface ProposedEvent {
   created_at: string;
 }
 
+// --- Preferences (v2) ---
+export type TransportMode = 'driving' | 'transit' | 'cycling' | 'walking';
+
+export interface UserPreferences {
+  home_address: string | null;
+  work_address: string | null;
+  preferred_transport_mode: TransportMode | null;
+}
+
 // --- Devices ---
 export interface DeviceRegisterRequest {
   platform: 'ios' | 'android';

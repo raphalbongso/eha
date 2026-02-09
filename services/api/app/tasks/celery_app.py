@@ -38,6 +38,11 @@ celery_app.conf.update(
             "task": "app.tasks.notification_tasks.cleanup_stale_device_tokens",
             "schedule": crontab(hour=3, minute=0),
         },
+        # v2: Check for upcoming events needing leave-time alerts (every 15 min)
+        "check-upcoming-events": {
+            "task": "app.tasks.leave_time_tasks.check_upcoming_events",
+            "schedule": crontab(minute="*/15"),
+        },
     },
 )
 

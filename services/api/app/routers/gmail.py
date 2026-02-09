@@ -5,6 +5,8 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
 
 from app.config import Settings, get_settings
 
@@ -12,11 +14,39 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/gmail", tags=["gmail"])
 
 
-def _verify_pubsub_token(request: Request, settings: Settings) -> dict | None:
-    """Verify Google Pub/Sub push JWT bearer token.
+def _verify_pubsub_jwt(token: str, settings: Settings) -> dict | None:
+    """Verify a Google Pub/Sub push JWT using Google's public keys.
 
-    Google Pub/Sub sends a JWT in the Authorization header.
-    We validate it to ensure the webhook is from Google.
+    Returns the decoded claims on success, None on failure.
+    """
+    try:
+        claims = id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            audience=None,
+        )
+        # Verify the issuer is Google's accounts service
+        issuer = claims.get("iss", "")
+        if issuer not in ("accounts.google.com", "https://accounts.google.com"):
+            logger.warning("Pub/Sub JWT has unexpected issuer: %s", issuer)
+            return None
+        # Optionally verify the email matches a known service account
+        email = claims.get("email", "")
+        if email and not email.endswith(".iam.gserviceaccount.com"):
+            logger.warning("Pub/Sub JWT email is not a service account: %s", email[:10] + "***")
+            return None
+        return claims
+    except Exception as e:
+        logger.warning("Pub/Sub JWT verification failed: %s", e)
+        return None
+
+
+def _verify_pubsub_token(request: Request, settings: Settings) -> dict | None:
+    """Verify Google Pub/Sub push authorization.
+
+    Supports:
+    1. Simple verification token (development)
+    2. Full JWT verification via Google's public keys (production)
     """
     auth_header = request.headers.get("authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -24,15 +54,16 @@ def _verify_pubsub_token(request: Request, settings: Settings) -> dict | None:
 
     token = auth_header[7:]
 
-    # For development, accept a simple verification token
+    # Dev mode: accept simple verification token
     verification_token = settings.google_pubsub_verification_token.get_secret_value()
     if verification_token and token == verification_token:
-        return {"verified": True}
+        return {"verified": True, "mode": "token"}
 
-    # In production, verify the Google-signed JWT
-    # This requires fetching Google's public keys and validating
-    # For now, we accept if the token matches our verification token
-    logger.warning("Pub/Sub JWT verification not fully implemented for production")
+    # Production: verify Google-signed JWT
+    claims = _verify_pubsub_jwt(token, settings)
+    if claims:
+        return {"verified": True, "mode": "jwt", "email": claims.get("email")}
+
     return None
 
 

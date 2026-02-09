@@ -19,6 +19,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     volumes:
       - ./services/api:/app
     restart: unless-stopped
@@ -27,6 +33,7 @@ services:
     build:
       context: ./services/api
       dockerfile: Dockerfile
+    entrypoint: []
     command: celery -A app.tasks.celery_app worker -l info -Q default,gmail,notifications
     env_file:
       - .env
@@ -36,8 +43,10 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
     depends_on:
-      - api
-      - redis
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./services/api:/app
     restart: unless-stopped
@@ -46,6 +55,7 @@ services:
     build:
       context: ./services/api
       dockerfile: Dockerfile
+    entrypoint: []
     command: celery -A app.tasks.celery_app beat -l info
     env_file:
       - .env
@@ -55,8 +65,10 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
     depends_on:
-      - api
-      - redis
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   db:

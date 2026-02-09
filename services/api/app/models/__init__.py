@@ -9,6 +9,7 @@ from app.models.processed_message import ProcessedMessage
 from app.models.proposed_event import EventStatus, ProposedEvent
 from app.models.rule import Rule
 from app.models.user import User
+from app.models.user_preference import UserPreference
 
 __all__ = [
     "User",
@@ -21,4 +22,5 @@ __all__ = [
     "EventStatus",
     "DeviceToken",
     "AuditLog",
+    "UserPreference",
 ]
