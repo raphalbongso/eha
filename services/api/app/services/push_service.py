@@ -1,6 +1,5 @@
 """Push notification service for APNs and FCM."""
 
-import json
 import logging
 from enum import Enum
 from typing import Any

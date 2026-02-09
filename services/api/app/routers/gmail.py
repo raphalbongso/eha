@@ -5,7 +5,6 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from jose import jwt as jose_jwt
 
 from app.config import Settings, get_settings
 

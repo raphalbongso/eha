@@ -2,8 +2,6 @@
 
 from datetime import datetime, timezone
 
-import pytest
-
 from app.services.gmail_parser import ParsedMessage, parse_gmail_message
 
 

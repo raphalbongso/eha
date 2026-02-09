@@ -9,10 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings, get_settings
 from app.dependencies import get_current_user_id, get_db
 from app.models.oauth_token import OAuthToken
-from app.models.processed_message import ProcessedMessage
 from app.schemas.draft import AIExtractEventRequest, AIGenerateDraftsRequest, AISummarizeRequest, SummaryResponse
 from app.schemas.event import EventProposalResponse
-from app.services.ai_service import DraftProposal, get_ai_service
+from app.services.ai_service import get_ai_service
 from app.services.crypto_service import get_crypto_service
 from app.services.event_service import EventService
 from app.services.gmail_parser import parse_gmail_message

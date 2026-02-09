@@ -3,7 +3,6 @@
 import logging
 from datetime import datetime, time
 from typing import Any
-
 from zoneinfo import ZoneInfo
 
 from app.services.gmail_parser import ParsedMessage

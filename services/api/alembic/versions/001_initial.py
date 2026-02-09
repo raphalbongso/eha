@@ -32,7 +32,10 @@ def upgrade() -> None:
     # --- oauth_tokens ---
     op.create_table(
         "oauth_tokens",
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True,
+        ),
         sa.Column("encrypted_access_token", sa.LargeBinary, nullable=False),
         sa.Column("encrypted_refresh_token", sa.LargeBinary, nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
@@ -46,7 +49,10 @@ def upgrade() -> None:
     op.create_table(
         "rules",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
+        ),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("conditions", postgresql.JSONB, nullable=False),
         sa.Column("is_active", sa.Boolean, default=True, nullable=False),
@@ -60,7 +66,10 @@ def upgrade() -> None:
     op.create_table(
         "processed_messages",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
+        ),
         sa.Column("message_id", sa.String(255), nullable=False),
         sa.Column("thread_id", sa.String(255), nullable=True),
         sa.Column("subject", sa.Text, nullable=True),
@@ -79,9 +88,15 @@ def upgrade() -> None:
     op.create_table(
         "alerts",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
+        ),
         sa.Column("message_id", sa.String(255), nullable=False),
-        sa.Column("rule_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("rules.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "rule_id", postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("rules.id", ondelete="SET NULL"), nullable=True,
+        ),
         sa.Column("read", sa.Boolean, default=False, nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
@@ -93,7 +108,10 @@ def upgrade() -> None:
     op.create_table(
         "drafts",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
+        ),
         sa.Column("message_id", sa.String(255), nullable=False),
         sa.Column("gmail_draft_id", sa.String(255), nullable=True),
         sa.Column("content_preview", sa.Text, nullable=False),
@@ -109,7 +127,10 @@ def upgrade() -> None:
     op.create_table(
         "proposed_events",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
+        ),
         sa.Column("message_id", sa.String(255), nullable=False),
         sa.Column("event_data", postgresql.JSONB, nullable=False),
         sa.Column("status", event_status, default="proposed", nullable=False),
@@ -121,7 +142,10 @@ def upgrade() -> None:
     op.create_table(
         "device_tokens",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
+        ),
         sa.Column("platform", sa.String(10), nullable=False),
         sa.Column("token", sa.String(512), nullable=False),
         sa.Column("device_id", sa.String(255), nullable=False),
@@ -134,7 +158,10 @@ def upgrade() -> None:
     op.create_table(
         "audit_log",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False,
+        ),
         sa.Column("action", sa.String(100), nullable=False),
         sa.Column("entity_type", sa.String(100), nullable=False),
         sa.Column("entity_id", sa.String(255), nullable=True),
@@ -147,7 +174,10 @@ def upgrade() -> None:
     # --- v2 hooks: user_preferences ---
     op.create_table(
         "user_preferences",
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+        sa.Column(
+            "user_id", postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True,
+        ),
         sa.Column("home_address", sa.Text, nullable=True),
         sa.Column("work_address", sa.Text, nullable=True),
         sa.Column("preferred_transport_mode", sa.String(20), nullable=True, server_default="driving"),

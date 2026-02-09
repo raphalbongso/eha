@@ -1,7 +1,5 @@
 """Tests for AI event extraction output validation."""
 
-import json
-
 import jsonschema
 import pytest
 

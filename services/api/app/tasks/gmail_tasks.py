@@ -1,7 +1,6 @@
 """Celery tasks for Gmail processing."""
 
 import logging
-from datetime import datetime, timezone
 
 from celery import shared_task
 from sqlalchemy import select
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
 def _get_sync_session():
     """Create a synchronous DB session for Celery tasks."""
     from sqlalchemy import create_engine
-    from sqlalchemy.orm import Session, sessionmaker
+    from sqlalchemy.orm import sessionmaker
 
     settings = get_settings()
     # Convert async URL to sync

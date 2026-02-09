@@ -3,9 +3,9 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, String, DateTime, Boolean, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 

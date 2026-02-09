@@ -1,7 +1,6 @@
 """Shared test fixtures."""
 
 import uuid
-from datetime import datetime, timezone
 
 import pytest
 
@@ -32,8 +31,13 @@ def sample_gmail_message() -> dict:
                 {
                     "mimeType": "text/plain",
                     "body": {
-                        # base64url of "Please join our team meeting tomorrow at 3pm in Room 42.\n\nLet me know if you can make it.\n\nBest,\nAlice"
-                        "data": "UGxlYXNlIGpvaW4gb3VyIHRlYW0gbWVldGluZyB0b21vcnJvdyBhdCAzcG0gaW4gUm9vbSA0Mi4KCkxldCBtZSBrbm93IGlmIHlvdSBjYW4gbWFrZSBpdC4KCkJlc3QsCkFsaWNl"
+                        # base64url of "Please join our team meeting tomorrow
+                        # at 3pm in Room 42.\n\nLet me know...\n\nBest,\nAlice"
+                        "data": (
+                            "UGxlYXNlIGpvaW4gb3VyIHRlYW0gbWVldGluZyB0b21vcnJvdyBhdCAzcG0gaW4g"
+                            "Um9vbSA0Mi4KCkxldCBtZSBrbm93IGlmIHlvdSBjYW4gbWFrZSBpdC4KCkJlc3Qs"
+                            "CkFsaWNl"
+                        ),
                     },
                 },
                 {

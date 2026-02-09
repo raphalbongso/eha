@@ -1,7 +1,7 @@
 """SQLAlchemy base and common utilities."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import DateTime, func
 from sqlalchemy.dialects.postgresql import UUID

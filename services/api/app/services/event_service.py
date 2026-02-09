@@ -6,7 +6,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.proposed_event import EventStatus, ProposedEvent
-from app.services.ai_service import AIService, EventProposal
+from app.services.ai_service import AIService
 from app.services.audit_service import write_audit_log
 
 logger = logging.getLogger(__name__)

@@ -10,7 +10,6 @@ from sqlalchemy.orm import joinedload
 from app.dependencies import get_current_user_id, get_db
 from app.models.alert import Alert
 from app.models.processed_message import ProcessedMessage
-from app.models.rule import Rule
 from app.schemas.alert import AlertMarkReadRequest, AlertResponse
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])

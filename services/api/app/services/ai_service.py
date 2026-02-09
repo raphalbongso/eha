@@ -110,7 +110,7 @@ def _parse_json_safe(text: str) -> dict[str, Any] | None:
     if text.startswith("```"):
         lines = text.split("\n")
         # Remove first and last line (code block markers)
-        lines = [l for l in lines if not l.strip().startswith("```")]
+        lines = [line for line in lines if not line.strip().startswith("```")]
         text = "\n".join(lines)
     try:
         return json.loads(text)
