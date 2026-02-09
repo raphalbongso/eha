@@ -20,11 +20,7 @@ async def list_rules(
     db: AsyncSession = Depends(get_db),
 ):
     """List all rules for the current user."""
-    result = await db.execute(
-        select(Rule)
-        .where(Rule.user_id == user_id)
-        .order_by(Rule.created_at.desc())
-    )
+    result = await db.execute(select(Rule).where(Rule.user_id == user_id).order_by(Rule.created_at.desc()))
     rules = result.scalars().all()
     return [
         RuleResponse(
@@ -81,9 +77,7 @@ async def get_rule(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a specific rule."""
-    result = await db.execute(
-        select(Rule).where(Rule.id == rule_id, Rule.user_id == user_id)
-    )
+    result = await db.execute(select(Rule).where(Rule.id == rule_id, Rule.user_id == user_id))
     rule = result.scalar_one_or_none()
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -106,9 +100,7 @@ async def update_rule(
     db: AsyncSession = Depends(get_db),
 ):
     """Update a rule."""
-    result = await db.execute(
-        select(Rule).where(Rule.id == rule_id, Rule.user_id == user_id)
-    )
+    result = await db.execute(select(Rule).where(Rule.id == rule_id, Rule.user_id == user_id))
     rule = result.scalar_one_or_none()
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
@@ -147,9 +139,7 @@ async def delete_rule(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a rule."""
-    result = await db.execute(
-        select(Rule).where(Rule.id == rule_id, Rule.user_id == user_id)
-    )
+    result = await db.execute(select(Rule).where(Rule.id == rule_id, Rule.user_id == user_id))
     rule = result.scalar_one_or_none()
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")

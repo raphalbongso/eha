@@ -53,16 +53,21 @@ class GmailService:
 
         # Run in executor since google-api-python-client is synchronous
         import asyncio
+
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
             None,
-            lambda: service.users().watch(
-                userId="me",
-                body={
-                    "topicName": self._settings.google_pubsub_topic,
-                    "labelIds": ["INBOX"],
-                },
-            ).execute(),
+            lambda: (
+                service.users()
+                .watch(
+                    userId="me",
+                    body={
+                        "topicName": self._settings.google_pubsub_topic,
+                        "labelIds": ["INBOX"],
+                    },
+                )
+                .execute()
+            ),
         )
         logger.info("Gmail watch set up, historyId=%s", response.get("historyId"))
         return response
@@ -81,6 +86,7 @@ class GmailService:
         service = self._build_service(creds)
 
         import asyncio
+
         loop = asyncio.get_event_loop()
 
         all_history: list[dict[str, Any]] = []
@@ -120,15 +126,21 @@ class GmailService:
         service = self._build_service(creds)
 
         import asyncio
+
         loop = asyncio.get_event_loop()
 
         return await loop.run_in_executor(
             None,
-            lambda: service.users().messages().get(
-                userId="me",
-                id=message_id,
-                format="full",
-            ).execute(),
+            lambda: (
+                service.users()
+                .messages()
+                .get(
+                    userId="me",
+                    id=message_id,
+                    format="full",
+                )
+                .execute()
+            ),
         )
 
     async def create_draft(
@@ -167,14 +179,20 @@ class GmailService:
         service = self._build_service(creds)
 
         import asyncio
+
         loop = asyncio.get_event_loop()
 
         return await loop.run_in_executor(
             None,
-            lambda: service.users().drafts().create(
-                userId="me",
-                body=draft_body,
-            ).execute(),
+            lambda: (
+                service.users()
+                .drafts()
+                .create(
+                    userId="me",
+                    body=draft_body,
+                )
+                .execute()
+            ),
         )
 
 

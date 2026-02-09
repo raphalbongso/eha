@@ -44,9 +44,7 @@ async def delete_user_data(
     )
 
     # Revoke Google tokens if possible
-    result = await db.execute(
-        select(OAuthToken).where(OAuthToken.user_id == user_id)
-    )
+    result = await db.execute(select(OAuthToken).where(OAuthToken.user_id == user_id))
     oauth_token = result.scalar_one_or_none()
 
     if oauth_token:
@@ -57,6 +55,7 @@ async def delete_user_data(
             access_token = crypto.decrypt(oauth_token.encrypted_access_token)
 
             import httpx
+
             async with httpx.AsyncClient() as client:
                 await client.post(
                     "https://oauth2.googleapis.com/revoke",
@@ -69,9 +68,7 @@ async def delete_user_data(
     # Delete all user data (cascade via FK on User handles most)
     # But explicit for safety:
     for model in [Alert, Draft, ProposedEvent, ProcessedMessage, DeviceToken, Rule, AuditLog, OAuthToken]:
-        await db.execute(
-            delete(model).where(model.user_id == user_id)
-        )
+        await db.execute(delete(model).where(model.user_id == user_id))
 
     # Finally delete the user
     await db.execute(delete(User).where(User.id == user_id))

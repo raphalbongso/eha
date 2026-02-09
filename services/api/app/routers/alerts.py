@@ -75,9 +75,5 @@ async def mark_alerts_read(
 ):
     """Mark alerts as read."""
     alert_uuids = [uuid.UUID(aid) for aid in body.alert_ids]
-    await db.execute(
-        update(Alert)
-        .where(Alert.user_id == user_id, Alert.id.in_(alert_uuids))
-        .values(read=True)
-    )
+    await db.execute(update(Alert).where(Alert.user_id == user_id, Alert.id.in_(alert_uuids)).values(read=True))
     return {"status": "ok", "marked": len(alert_uuids)}

@@ -70,9 +70,7 @@ def sample_gmail_message_with_attachment() -> dict:
             "parts": [
                 {
                     "mimeType": "text/plain",
-                    "body": {
-                        "data": "UGxlYXNlIGZpbmQgdGhlIHJlcG9ydCBhdHRhY2hlZC4="
-                    },
+                    "body": {"data": "UGxlYXNlIGZpbmQgdGhlIHJlcG9ydCBhdHRhY2hlZC4="},
                 },
                 {
                     "mimeType": "application/pdf",

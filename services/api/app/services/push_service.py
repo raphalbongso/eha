@@ -61,10 +61,9 @@ class PushService:
                 token=token,
             )
             import asyncio
+
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None, lambda: messaging.send(message)
-            )
+            result = await loop.run_in_executor(None, lambda: messaging.send(message))
             logger.info("FCM sent: %s", result)
             return True
         except Exception as e:

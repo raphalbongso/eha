@@ -117,9 +117,7 @@ class TestTimeWindow:
         msg = _make_message(received_at=datetime(2024, 2, 1, 14, 30, tzinfo=timezone.utc))
         conditions = {
             "logic": "AND",
-            "conditions": [
-                {"type": "time_window", "value": {"start": "09:00", "end": "17:00", "timezone": "UTC"}}
-            ],
+            "conditions": [{"type": "time_window", "value": {"start": "09:00", "end": "17:00", "timezone": "UTC"}}],
         }
         assert evaluate_rule(conditions, msg) is True
 
@@ -128,9 +126,7 @@ class TestTimeWindow:
         msg = _make_message(received_at=datetime(2024, 2, 1, 3, 0, tzinfo=timezone.utc))
         conditions = {
             "logic": "AND",
-            "conditions": [
-                {"type": "time_window", "value": {"start": "09:00", "end": "17:00", "timezone": "UTC"}}
-            ],
+            "conditions": [{"type": "time_window", "value": {"start": "09:00", "end": "17:00", "timezone": "UTC"}}],
         }
         assert evaluate_rule(conditions, msg) is False
 
@@ -139,9 +135,7 @@ class TestTimeWindow:
         msg = _make_message(received_at=datetime(2024, 2, 1, 23, 0, tzinfo=timezone.utc))
         conditions = {
             "logic": "AND",
-            "conditions": [
-                {"type": "time_window", "value": {"start": "22:00", "end": "06:00", "timezone": "UTC"}}
-            ],
+            "conditions": [{"type": "time_window", "value": {"start": "22:00", "end": "06:00", "timezone": "UTC"}}],
         }
         assert evaluate_rule(conditions, msg) is True
 

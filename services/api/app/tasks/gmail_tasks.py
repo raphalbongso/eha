@@ -55,18 +55,14 @@ def process_gmail_notification(self, email_address: str, history_id: str):
 
     try:
         # Find user
-        user = session.execute(
-            select(User).where(User.email == email_address)
-        ).scalar_one_or_none()
+        user = session.execute(select(User).where(User.email == email_address)).scalar_one_or_none()
 
         if not user:
             logger.warning("No user found for email (notification ignored)")
             return
 
         # Get OAuth token
-        oauth_token = session.execute(
-            select(OAuthToken).where(OAuthToken.user_id == user.id)
-        ).scalar_one_or_none()
+        oauth_token = session.execute(select(OAuthToken).where(OAuthToken.user_id == user.id)).scalar_one_or_none()
 
         if not oauth_token:
             logger.warning("No OAuth token for user=%s", user.id)
@@ -80,6 +76,7 @@ def process_gmail_notification(self, email_address: str, history_id: str):
         gmail = GmailService(settings, crypto)
 
         import asyncio
+
         loop = asyncio.new_event_loop()
         try:
             history_records = loop.run_until_complete(
@@ -93,14 +90,15 @@ def process_gmail_notification(self, email_address: str, history_id: str):
             loop.close()
 
         # Get user's active rules
-        rules = session.execute(
-            select(Rule).where(Rule.user_id == user.id, Rule.is_active == True)  # noqa: E712
-        ).scalars().all()
+        rules = (
+            session.execute(
+                select(Rule).where(Rule.user_id == user.id, Rule.is_active == True)  # noqa: E712
+            )
+            .scalars()
+            .all()
+        )
 
-        rule_dicts = [
-            {"id": str(r.id), "name": r.name, "conditions": r.conditions}
-            for r in rules
-        ]
+        rule_dicts = [{"id": str(r.id), "name": r.name, "conditions": r.conditions} for r in rules]
 
         new_message_ids = set()
         for record in history_records:
@@ -164,19 +162,22 @@ def _process_single_message(
     parsed = parse_gmail_message(raw_msg)
 
     # Idempotent insert
-    stmt = pg_insert(ProcessedMessage).values(
-        user_id=user.id,
-        message_id=parsed.message_id,
-        thread_id=parsed.thread_id,
-        subject=parsed.subject,
-        from_addr=parsed.from_addr,
-        snippet=parsed.snippet,
-        has_attachment=parsed.has_attachment,
-        label_ids=",".join(parsed.label_ids) if parsed.label_ids else None,
-        received_at=parsed.received_at,
-    ).on_conflict_do_nothing(
-        constraint="uq_user_message"
-    ).returning(ProcessedMessage.id)
+    stmt = (
+        pg_insert(ProcessedMessage)
+        .values(
+            user_id=user.id,
+            message_id=parsed.message_id,
+            thread_id=parsed.thread_id,
+            subject=parsed.subject,
+            from_addr=parsed.from_addr,
+            snippet=parsed.snippet,
+            has_attachment=parsed.has_attachment,
+            label_ids=",".join(parsed.label_ids) if parsed.label_ids else None,
+            received_at=parsed.received_at,
+        )
+        .on_conflict_do_nothing(constraint="uq_user_message")
+        .returning(ProcessedMessage.id)
+    )
 
     result = session.execute(stmt)
     inserted = result.fetchone()
@@ -235,6 +236,7 @@ def poll_gmail_fallback():
                 gmail = GmailService(settings, crypto)
 
                 import asyncio
+
                 loop = asyncio.new_event_loop()
                 try:
                     # Re-establish watch (idempotent)
@@ -250,9 +252,7 @@ def poll_gmail_fallback():
                 new_history_id = str(watch_response.get("historyId", ""))
                 if new_history_id and token.last_history_id:
                     # Fetch any missed history
-                    user = session.execute(
-                        select(User).where(User.id == token.user_id)
-                    ).scalar_one_or_none()
+                    user = session.execute(select(User).where(User.id == token.user_id)).scalar_one_or_none()
 
                     if user:
                         process_gmail_notification.delay(

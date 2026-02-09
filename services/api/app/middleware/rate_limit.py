@@ -35,6 +35,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if auth.startswith("Bearer "):
             # Use token hash as identifier (don't store full token)
             import hashlib
+
             token = auth[7:]
             return hashlib.sha256(token.encode()).hexdigest()[:16]
         # Fall back to IP for unauthenticated requests
@@ -83,9 +84,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
             response = await call_next(request)
             response.headers["X-RateLimit-Limit"] = str(self._max_requests)
-            response.headers["X-RateLimit-Remaining"] = str(
-                max(0, self._max_requests - request_count - 1)
-            )
+            response.headers["X-RateLimit-Remaining"] = str(max(0, self._max_requests - request_count - 1))
             return response
 
         except redis.RedisError as e:

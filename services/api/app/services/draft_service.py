@@ -38,9 +38,7 @@ class DraftService:
         explicitly open and send it. EHA NEVER sends emails automatically.
         """
         # Get user's OAuth tokens
-        result = await db.execute(
-            select(OAuthToken).where(OAuthToken.user_id == user_id)
-        )
+        result = await db.execute(select(OAuthToken).where(OAuthToken.user_id == user_id))
         token = result.scalar_one_or_none()
         if not token:
             raise ValueError("No OAuth token found for user")

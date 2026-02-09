@@ -23,11 +23,7 @@ async def list_proposed_events(
     status_filter: str | None = Query(None, alias="status"),
 ):
     """List proposed events for the current user."""
-    query = (
-        select(ProposedEvent)
-        .where(ProposedEvent.user_id == user_id)
-        .order_by(ProposedEvent.created_at.desc())
-    )
+    query = select(ProposedEvent).where(ProposedEvent.user_id == user_id).order_by(ProposedEvent.created_at.desc())
 
     if status_filter:
         try:

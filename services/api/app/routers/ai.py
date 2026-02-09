@@ -31,9 +31,7 @@ async def _fetch_email_content(
     The full body is fetched transiently and NOT stored permanently.
     """
     # Get OAuth tokens
-    result = await db.execute(
-        select(OAuthToken).where(OAuthToken.user_id == user_id)
-    )
+    result = await db.execute(select(OAuthToken).where(OAuthToken.user_id == user_id))
     token = result.scalar_one_or_none()
     if not token:
         raise HTTPException(status_code=400, detail="Gmail not connected")

@@ -12,9 +12,7 @@ from app.models.base import Base
 
 class ProcessedMessage(Base):
     __tablename__ = "processed_messages"
-    __table_args__ = (
-        UniqueConstraint("user_id", "message_id", name="uq_user_message"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "message_id", name="uq_user_message"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

@@ -66,10 +66,7 @@ async def list_drafts(
 ):
     """List drafts created by the current user."""
     result = await db.execute(
-        select(Draft)
-        .where(Draft.user_id == user_id)
-        .order_by(Draft.created_at.desc())
-        .limit(limit)
+        select(Draft).where(Draft.user_id == user_id).order_by(Draft.created_at.desc()).limit(limit)
     )
     drafts = result.scalars().all()
     return [

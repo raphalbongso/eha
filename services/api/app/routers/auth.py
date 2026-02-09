@@ -78,11 +78,9 @@ async def google_auth_start(settings: Settings = Depends(get_settings)):
     }
 
     # Build code_challenge (S256)
-    code_challenge = (
-        hashlib.sha256(code_verifier.encode("ascii"))
-        .digest()
-    )
+    code_challenge = hashlib.sha256(code_verifier.encode("ascii")).digest()
     import base64
+
     code_challenge_b64 = base64.urlsafe_b64encode(code_challenge).rstrip(b"=").decode("ascii")
 
     params = {
@@ -98,6 +96,7 @@ async def google_auth_start(settings: Settings = Depends(get_settings)):
     }
 
     from urllib.parse import urlencode
+
     auth_url = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
 
     return GoogleAuthStartResponse(auth_url=auth_url, state=state)

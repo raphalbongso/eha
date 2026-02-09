@@ -51,9 +51,7 @@ def send_push_for_alert(
         user_uuid = uuid.UUID(user_id)
 
         # Get all device tokens for this user
-        devices = session.execute(
-            select(DeviceToken).where(DeviceToken.user_id == user_uuid)
-        ).scalars().all()
+        devices = session.execute(select(DeviceToken).where(DeviceToken.user_id == user_uuid)).scalars().all()
 
         if not devices:
             logger.debug("No device tokens for user=%s", user_id)
@@ -114,9 +112,7 @@ def send_event_proposal_push(
 
     try:
         user_uuid = uuid.UUID(user_id)
-        devices = session.execute(
-            select(DeviceToken).where(DeviceToken.user_id == user_uuid)
-        ).scalars().all()
+        devices = session.execute(select(DeviceToken).where(DeviceToken.user_id == user_uuid)).scalars().all()
 
         if not devices:
             return
