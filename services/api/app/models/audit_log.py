@@ -22,7 +22,7 @@ class AuditLog(Base, UUIDPrimaryKeyMixin):
     action: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. "rule.created", "draft.created"
     entity_type: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. "rule", "draft", "event"
     entity_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    extra_data: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default="now()",

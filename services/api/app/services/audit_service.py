@@ -22,7 +22,7 @@ async def write_audit_log(
         action=action,
         entity_type=entity_type,
         entity_id=entity_id,
-        metadata=metadata,
+        extra_data=metadata,
     )
     db.add(log_entry)
     await db.flush()
