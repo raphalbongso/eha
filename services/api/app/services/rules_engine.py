@@ -1,7 +1,7 @@
 """Rules engine for matching emails against user-defined rules."""
 
 import logging
-from datetime import datetime, time
+from datetime import time
 from typing import Any
 from zoneinfo import ZoneInfo
 
