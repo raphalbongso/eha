@@ -48,8 +48,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description="AI-powered email assistant with smart notifications and calendar integration",
         version="1.0.0",
         lifespan=lifespan,
-        docs_url="/docs" if settings.app_env != "production" else None,
-        redoc_url="/redoc" if settings.app_env != "production" else None,
+        docs_url="/docs",
+        redoc_url="/redoc",
     )
 
     # Middleware (order matters: outermost first)
