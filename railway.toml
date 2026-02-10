@@ -1,6 +1,5 @@
 [build]
 dockerfilePath = "services/api/Dockerfile"
-watchPatterns = ["services/api/**"]
 
 [deploy]
 restartPolicyType = "on_failure"
