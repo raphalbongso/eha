@@ -56,9 +56,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(ErrorHandlerMiddleware)
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(RateLimitMiddleware, settings=settings)
+    origins = settings.cors_origins
+    allow_all = origins == ["*"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=origins if not allow_all else [],
+        allow_origin_regex=r".*" if allow_all else None,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Accept"],
