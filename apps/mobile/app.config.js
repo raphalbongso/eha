@@ -2,6 +2,7 @@ export default {
   expo: {
     name: "EHA",
     slug: "eha",
+    scheme: "eha",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",

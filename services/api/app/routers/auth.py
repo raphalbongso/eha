@@ -132,6 +132,20 @@ async def google_auth_start(settings: Settings = Depends(get_settings)):
     return GoogleAuthStartResponse(auth_url=auth_url, state=state)
 
 
+@router.get("/google/callback")
+async def google_auth_redirect(
+    code: str,
+    state: str,
+):
+    """Google redirects here after consent. Redirect to mobile app deep link."""
+    from urllib.parse import urlencode
+
+    from fastapi.responses import RedirectResponse
+
+    params = urlencode({"code": code, "state": state})
+    return RedirectResponse(url=f"eha://auth/callback?{params}")
+
+
 @router.post("/google/callback", response_model=TokenResponse)
 async def google_auth_callback(
     body: GoogleAuthCallbackRequest,
@@ -141,10 +155,12 @@ async def google_auth_callback(
     """Exchange authorization code for tokens. Creates/updates user."""
     import httpx
 
-    # Verify state from Redis (atomic pop)
+    # Verify state from Redis (atomic pop) and retrieve code_verifier
     pending = await _pop_pkce_state(body.state, settings)
     if not pending:
         raise HTTPException(status_code=400, detail="Invalid or expired state")
+
+    code_verifier = pending["code_verifier"]
 
     # Exchange code for Google tokens
     async with httpx.AsyncClient() as client:
@@ -154,7 +170,7 @@ async def google_auth_callback(
                 "client_id": settings.google_client_id,
                 "client_secret": settings.google_client_secret.get_secret_value(),
                 "code": body.code,
-                "code_verifier": body.code_verifier,
+                "code_verifier": code_verifier,
                 "grant_type": "authorization_code",
                 "redirect_uri": settings.google_redirect_uri,
             },

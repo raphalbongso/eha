@@ -1,6 +1,6 @@
 """Auth request/response schemas."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class GoogleAuthStartResponse(BaseModel):
@@ -11,7 +11,6 @@ class GoogleAuthStartResponse(BaseModel):
 class GoogleAuthCallbackRequest(BaseModel):
     code: str
     state: str
-    code_verifier: str = Field(..., min_length=43, max_length=128)
 
 
 class TokenResponse(BaseModel):

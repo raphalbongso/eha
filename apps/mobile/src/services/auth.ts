@@ -37,17 +37,10 @@ export async function startGoogleAuth(): Promise<TokenResponse> {
   }
 
   // Step 4: Exchange code for tokens via backend
-  // Note: code_verifier should be passed from the start response in production.
-  // In the PKCE flow, the backend generates and stores the code_verifier,
-  // but the mobile app needs to pass it back. For the MVP, the backend
-  // handles this via the state parameter mapping.
+  // The backend retrieves the code_verifier from Redis using the state parameter
   const { data: tokens } = await api.post<TokenResponse>(
     '/auth/google/callback',
-    {
-      code,
-      state,
-      code_verifier: state, // Backend maps state to code_verifier
-    },
+    { code, state },
   );
 
   // Step 5: Store tokens
