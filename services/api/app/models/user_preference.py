@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -32,6 +32,10 @@ class UserPreference(Base, TimestampMixin):
     # v2: Data & Privacy — opt-in email content storage
     store_email_content: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
+    )
+    # v2: Data & Privacy — AI data retention (NULL = keep forever)
+    ai_data_retention_days: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
     )
 
     # Relationships

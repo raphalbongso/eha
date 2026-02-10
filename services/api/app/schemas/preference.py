@@ -12,6 +12,7 @@ class PreferenceResponse(BaseModel):
     auto_categorize_enabled: bool = False
     auto_label_enabled: bool = False
     store_email_content: bool = False
+    ai_data_retention_days: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -23,3 +24,4 @@ class PreferenceUpdate(BaseModel):
     auto_categorize_enabled: bool | None = None
     auto_label_enabled: bool | None = None
     store_email_content: bool | None = None
+    ai_data_retention_days: int | None = Field(None, ge=0, le=3650)

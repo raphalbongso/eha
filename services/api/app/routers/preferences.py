@@ -52,6 +52,9 @@ async def update_preferences(
         pref.auto_label_enabled = body.auto_label_enabled
     if body.store_email_content is not None:
         pref.store_email_content = body.store_email_content
+    if body.ai_data_retention_days is not None:
+        # 0 means "clear retention" (keep forever); any positive value sets the period
+        pref.ai_data_retention_days = body.ai_data_retention_days or None
 
     await db.flush()
     return PreferenceResponse.model_validate(pref)

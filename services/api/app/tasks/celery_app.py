@@ -27,6 +27,7 @@ celery_app.conf.update(
         "app.tasks.gmail_tasks.*": {"queue": "gmail"},
         "app.tasks.notification_tasks.*": {"queue": "notifications"},
         "app.tasks.automation_tasks.*": {"queue": "default"},
+        "app.tasks.retention_tasks.*": {"queue": "default"},
     },
     beat_schedule={
         # Gmail polling fallback: run every 60s for users whose watch may have expired
@@ -58,6 +59,11 @@ celery_app.conf.update(
         "send-digest-notifications": {
             "task": "app.tasks.automation_tasks.send_digest_notifications",
             "schedule": crontab(minute=0),
+        },
+        # v2: Cleanup expired AI data: daily at 4 AM UTC
+        "cleanup-expired-ai-data": {
+            "task": "app.tasks.retention_tasks.cleanup_expired_ai_data",
+            "schedule": crontab(hour=4, minute=0),
         },
     },
 )
