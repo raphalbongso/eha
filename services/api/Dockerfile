@@ -8,8 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN pip install uv
 
-ARG BUILD_CONTEXT=.
-COPY ${BUILD_CONTEXT} .
+COPY services/api/ .
 RUN uv pip install --system --no-cache -e ".[dev]"
 
 RUN chmod +x entrypoint.sh

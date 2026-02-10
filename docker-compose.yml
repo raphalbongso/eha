@@ -3,8 +3,8 @@ version: "3.9"
 services:
   api:
     build:
-      context: ./services/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/api/Dockerfile
     command: ["--reload"]
     ports:
       - "8000:8000"
@@ -34,8 +34,8 @@ services:
 
   celery-worker:
     build:
-      context: ./services/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/api/Dockerfile
     entrypoint: []
     command: celery -A app.tasks.celery_app worker -l info -Q default,gmail,notifications
     env_file:
@@ -58,8 +58,8 @@ services:
 
   celery-beat:
     build:
-      context: ./services/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/api/Dockerfile
     entrypoint: []
     command: celery -A app.tasks.celery_app beat -l info
     env_file:
