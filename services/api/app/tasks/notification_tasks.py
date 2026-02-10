@@ -72,6 +72,11 @@ def send_push_for_alert(
                     "message_subject": subject,
                 },
             )
+
+            from app.metrics import notifications_sent_total
+
+            notifications_sent_total.labels(type="rule_match").inc()
+
             await db.commit()
 
     asyncio.run(_send())
@@ -109,6 +114,11 @@ def send_event_proposal_push(
                 notification_type=NotificationType.EVENT_PROPOSAL,
                 extra_data={"event_title": event_title},
             )
+
+            from app.metrics import notifications_sent_total
+
+            notifications_sent_total.labels(type="event_proposal").inc()
+
             await db.commit()
 
     asyncio.run(_send())

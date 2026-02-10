@@ -234,6 +234,10 @@ def _process_single_message(
 
     session.flush()
 
+    from app.metrics import emails_processed_total
+
+    emails_processed_total.inc()
+
     # Auto-label in Gmail if enabled and category was detected
     if user_pref and user_pref.auto_label_enabled and category:
         try:
@@ -271,6 +275,10 @@ def _process_single_message(
             )
             session.add(alert)
             session.flush()
+
+            from app.metrics import alerts_created_total
+
+            alerts_created_total.inc()
 
             # Trigger push notification async
             from app.tasks.notification_tasks import send_push_for_alert

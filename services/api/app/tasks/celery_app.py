@@ -69,3 +69,44 @@ celery_app.conf.update(
 )
 
 celery_app.autodiscover_tasks(["app.tasks"])
+
+# --- Prometheus signal handlers for task metrics ---
+
+_task_start_times: dict[str, float] = {}
+
+
+@celery_app.on_after_configure.connect
+def _setup_task_signals(sender, **kwargs):
+    """Register Celery signals after app is configured to avoid circular imports."""
+    import time
+
+    from celery.signals import task_failure, task_postrun, task_prerun, task_retry
+
+    @task_prerun.connect
+    def _on_task_prerun(task_id, task, **kw):
+        _task_start_times[task_id] = time.monotonic()
+
+    @task_postrun.connect
+    def _on_task_postrun(task_id, task, **kw):
+        from app.metrics import celery_task_duration_seconds, celery_task_total
+
+        task_name = task.name or "unknown"
+        celery_task_total.labels(task_name=task_name, status="success").inc()
+        start = _task_start_times.pop(task_id, None)
+        if start is not None:
+            celery_task_duration_seconds.labels(task_name=task_name).observe(time.monotonic() - start)
+
+    @task_failure.connect
+    def _on_task_failure(task_id, sender, **kw):
+        from app.metrics import celery_task_total
+
+        task_name = sender.name if sender else "unknown"
+        celery_task_total.labels(task_name=task_name, status="failure").inc()
+        _task_start_times.pop(task_id, None)
+
+    @task_retry.connect
+    def _on_task_retry(sender, **kw):
+        from app.metrics import celery_task_total
+
+        task_name = sender.name if sender else "unknown"
+        celery_task_total.labels(task_name=task_name, status="retry").inc()

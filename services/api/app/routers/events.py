@@ -70,6 +70,10 @@ async def confirm_event(
     if not event:
         raise HTTPException(status_code=404, detail="Proposed event not found")
 
+    from app.metrics import events_proposed_total
+
+    events_proposed_total.labels(action="confirmed").inc()
+
     return EventProposalResponse(
         id=str(event.id),
         message_id=event.message_id,
@@ -98,6 +102,10 @@ async def dismiss_event(
 
     if not event:
         raise HTTPException(status_code=404, detail="Proposed event not found")
+
+    from app.metrics import events_proposed_total
+
+    events_proposed_total.labels(action="dismissed").inc()
 
     return EventProposalResponse(
         id=str(event.id),

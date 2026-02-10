@@ -48,6 +48,10 @@ async def create_draft(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    from app.metrics import drafts_created_total
+
+    drafts_created_total.inc()
+
     return DraftResponse(
         id=str(draft.id),
         message_id=draft.message_id,
