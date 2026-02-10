@@ -26,6 +26,7 @@ celery_app.conf.update(
     task_routes={
         "app.tasks.gmail_tasks.*": {"queue": "gmail"},
         "app.tasks.notification_tasks.*": {"queue": "notifications"},
+        "app.tasks.automation_tasks.*": {"queue": "default"},
     },
     beat_schedule={
         # Gmail polling fallback: run every 60s for users whose watch may have expired
@@ -42,6 +43,21 @@ celery_app.conf.update(
         "check-upcoming-events": {
             "task": "app.tasks.leave_time_tasks.check_upcoming_events",
             "schedule": crontab(minute="*/15"),
+        },
+        # v3: Check follow-up reminders (every 30 min)
+        "check-follow-up-reminders": {
+            "task": "app.tasks.automation_tasks.check_follow_up_reminders",
+            "schedule": crontab(minute="*/30"),
+        },
+        # v3: Check upcoming meetings for prep summaries (every hour)
+        "check-upcoming-meetings": {
+            "task": "app.tasks.automation_tasks.check_upcoming_meetings",
+            "schedule": crontab(minute=0),
+        },
+        # v3: Send digest notifications (every hour)
+        "send-digest-notifications": {
+            "task": "app.tasks.automation_tasks.send_digest_notifications",
+            "schedule": crontab(minute=0),
         },
     },
 )

@@ -227,6 +227,94 @@ Rules:
 
 THREAD_SMART_REPLY_SCHEMA = DRAFT_SCHEMA  # Same structure as single-message drafts
 
+# --- Meeting prep prompts & schemas ---
+
+MEETING_PREP_PROMPT = """Prepare a meeting briefing based on the meeting details and related emails below.
+
+Meeting:
+---
+Title: {meeting_title}
+Time: {meeting_time}
+Attendees: {attendees}
+---
+
+Related emails:
+---
+{related_emails}
+---
+
+Respond ONLY in JSON:
+{{
+  "agenda_context": "string summarizing background context for this meeting",
+  "key_discussion_points": ["string"],
+  "open_action_items": ["string"],
+  "relevant_attachments": ["string"]
+}}
+
+Rules:
+- agenda_context: brief overview connecting the related emails to the meeting topic
+- key_discussion_points: main topics likely to come up based on email history
+- open_action_items: unresolved tasks mentioned in the emails
+- relevant_attachments: filenames mentioned in emails that may be relevant
+- Do NOT invent information not present in the emails"""
+
+MEETING_PREP_SCHEMA = {
+    "type": "object",
+    "required": ["agenda_context", "key_discussion_points", "open_action_items", "relevant_attachments"],
+    "properties": {
+        "agenda_context": {"type": "string"},
+        "key_discussion_points": {"type": "array", "items": {"type": "string"}},
+        "open_action_items": {"type": "array", "items": {"type": "string"}},
+        "relevant_attachments": {"type": "array", "items": {"type": "string"}},
+    },
+    "additionalProperties": False,
+}
+
+# --- Digest summary prompts & schemas ---
+
+DIGEST_SUMMARY_PROMPT = """Summarize the following email alerts into a concise daily/weekly digest.
+
+Alerts since {period_start}:
+---
+{alert_summaries}
+---
+
+Total alerts: {alert_count}
+
+Respond ONLY in JSON:
+{{
+  "summary": "string - 2-3 sentence overview of all alerts",
+  "highlights": ["string - key items that need attention"],
+  "stats": {{
+    "total": number,
+    "by_category": {{"category_name": count}}
+  }}
+}}
+
+Rules:
+- Focus on the most important and actionable items
+- Group related alerts together in the summary
+- highlights should contain max 5 items, most urgent first"""
+
+DIGEST_SCHEMA = {
+    "type": "object",
+    "required": ["summary", "highlights", "stats"],
+    "properties": {
+        "summary": {"type": "string"},
+        "highlights": {"type": "array", "items": {"type": "string"}},
+        "stats": {
+            "type": "object",
+            "required": ["total", "by_category"],
+            "properties": {
+                "total": {"type": "integer", "minimum": 0},
+                "by_category": {"type": "object"},
+            },
+            "additionalProperties": False,
+        },
+    },
+    "additionalProperties": False,
+}
+
 # --- Style-aware drafts prompts & schemas ---
 
 STYLE_AWARE_DRAFT_PROMPT = """Analyze the user's writing style from their sent emails below,

@@ -10,10 +10,14 @@ from pydantic import BaseModel
 
 from app.config import Settings
 from app.services.ai_prompts import (
+    DIGEST_SCHEMA,
+    DIGEST_SUMMARY_PROMPT,
     DRAFT_REPLY_PROMPT,
     DRAFT_SCHEMA,
     EVENT_SCHEMA,
     EXTRACT_EVENT_PROMPT,
+    MEETING_PREP_PROMPT,
+    MEETING_PREP_SCHEMA,
     STYLE_AWARE_DRAFT_PROMPT,
     STYLE_DRAFT_SCHEMA,
     SUMMARIZE_PROMPT,
@@ -77,6 +81,19 @@ class DetectedStyle(BaseModel):
 class StyleAwareDraftResponse(BaseModel):
     detected_style: DetectedStyle
     drafts: list[DraftProposal]
+
+
+class MeetingPrepSummary(BaseModel):
+    agenda_context: str
+    key_discussion_points: list[str]
+    open_action_items: list[str]
+    relevant_attachments: list[str]
+
+
+class DigestSummary(BaseModel):
+    summary: str
+    highlights: list[str]
+    stats: dict
 
 
 class AIProvider(ABC):
@@ -328,6 +345,46 @@ class AIService:
             detected_style=DetectedStyle(**data["detected_style"]),
             drafts=[DraftProposal(**d) for d in data["drafts"]],
         )
+
+
+    async def generate_meeting_prep(
+        self,
+        meeting_title: str,
+        meeting_time: str,
+        attendees: list[str],
+        related_emails: list[dict],
+    ) -> MeetingPrepSummary | None:
+        """Generate a meeting prep summary from related emails."""
+        formatted = self._format_thread_messages(related_emails)
+        prompt = MEETING_PREP_PROMPT.format(
+            meeting_title=meeting_title,
+            meeting_time=meeting_time,
+            attendees=", ".join(attendees) if attendees else "N/A",
+            related_emails=formatted[:16000],
+        )
+        raw = await self._provider.complete(prompt)
+        data = _parse_json_safe(raw)
+        if data is None or not _validate_json(data, MEETING_PREP_SCHEMA):
+            return None
+        return MeetingPrepSummary(**data)
+
+    async def generate_digest_summary(
+        self,
+        alert_summaries: str,
+        alert_count: int,
+        period_start: str,
+    ) -> DigestSummary | None:
+        """Generate a digest summary from alert data."""
+        prompt = DIGEST_SUMMARY_PROMPT.format(
+            alert_summaries=alert_summaries[:16000],
+            alert_count=alert_count,
+            period_start=period_start,
+        )
+        raw = await self._provider.complete(prompt)
+        data = _parse_json_safe(raw)
+        if data is None or not _validate_json(data, DIGEST_SCHEMA):
+            return None
+        return DigestSummary(**data)
 
 
 _ai_service: AIService | None = None

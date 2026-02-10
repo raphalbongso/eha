@@ -46,6 +46,10 @@ async def update_preferences(
         pref.work_address = body.work_address
     if body.preferred_transport_mode is not None:
         pref.preferred_transport_mode = body.preferred_transport_mode
+    if body.auto_categorize_enabled is not None:
+        pref.auto_categorize_enabled = body.auto_categorize_enabled
+    if body.auto_label_enabled is not None:
+        pref.auto_label_enabled = body.auto_label_enabled
 
     await db.flush()
     return PreferenceResponse.model_validate(pref)

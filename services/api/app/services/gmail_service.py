@@ -218,6 +218,75 @@ class GmailService:
 
         return messages
 
+    async def get_or_create_label(
+        self,
+        encrypted_access_token: bytes,
+        encrypted_refresh_token: bytes,
+        label_name: str,
+    ) -> str:
+        """Get an existing Gmail label ID or create it. Returns the label ID."""
+        creds = self._get_credentials(encrypted_access_token, encrypted_refresh_token)
+        service = self._build_service(creds)
+
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+
+        # List existing labels
+        labels_response = await loop.run_in_executor(
+            None,
+            lambda: service.users().labels().list(userId="me").execute(),
+        )
+
+        for label in labels_response.get("labels", []):
+            if label["name"] == label_name:
+                return label["id"]
+
+        # Create the label
+        label_body = {
+            "name": label_name,
+            "labelListVisibility": "labelShow",
+            "messageListVisibility": "show",
+        }
+        created = await loop.run_in_executor(
+            None,
+            lambda: service.users().labels().create(userId="me", body=label_body).execute(),
+        )
+        logger.info("Created Gmail label: %s (id=%s)", label_name, created["id"])
+        return created["id"]
+
+    async def modify_message_labels(
+        self,
+        encrypted_access_token: bytes,
+        encrypted_refresh_token: bytes,
+        message_id: str,
+        add_label_ids: list[str] | None = None,
+        remove_label_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Add or remove labels from a Gmail message."""
+        creds = self._get_credentials(encrypted_access_token, encrypted_refresh_token)
+        service = self._build_service(creds)
+
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+
+        body: dict[str, Any] = {}
+        if add_label_ids:
+            body["addLabelIds"] = add_label_ids
+        if remove_label_ids:
+            body["removeLabelIds"] = remove_label_ids
+
+        return await loop.run_in_executor(
+            None,
+            lambda: (
+                service.users()
+                .messages()
+                .modify(userId="me", id=message_id, body=body)
+                .execute()
+            ),
+        )
+
     async def create_draft(
         self,
         encrypted_access_token: bytes,

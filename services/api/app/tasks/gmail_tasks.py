@@ -12,6 +12,7 @@ from app.models.oauth_token import OAuthToken
 from app.models.processed_message import ProcessedMessage
 from app.models.rule import Rule
 from app.models.user import User
+from app.models.user_preference import UserPreference
 from app.services.crypto_service import get_crypto_service
 from app.services.gmail_parser import parse_gmail_message
 from app.services.gmail_service import GmailService
@@ -100,6 +101,11 @@ def process_gmail_notification(self, email_address: str, history_id: str):
 
         rule_dicts = [{"id": str(r.id), "name": r.name, "conditions": r.conditions} for r in rules]
 
+        # Fetch user preferences for auto-categorize
+        user_pref = session.execute(
+            select(UserPreference).where(UserPreference.user_id == user.id)
+        ).scalar_one_or_none()
+
         new_message_ids = set()
         for record in history_records:
             for msg_added in record.get("messagesAdded", []):
@@ -118,6 +124,7 @@ def process_gmail_notification(self, email_address: str, history_id: str):
                 message_id=msg_id,
                 rule_dicts=rule_dicts,
                 settings=settings,
+                user_pref=user_pref,
             )
 
         # Update last historyId
@@ -142,8 +149,9 @@ def _process_single_message(
     message_id: str,
     rule_dicts: list[dict],
     settings,
+    user_pref: UserPreference | None = None,
 ):
-    """Process a single Gmail message: insert, match rules, create alerts."""
+    """Process a single Gmail message: insert, match rules, create alerts, auto-categorize."""
     import asyncio
 
     # Fetch full message
@@ -161,6 +169,30 @@ def _process_single_message(
 
     parsed = parse_gmail_message(raw_msg)
 
+    # Auto-categorize via AI if enabled
+    category = None
+    if user_pref and user_pref.auto_categorize_enabled:
+        try:
+            from app.services.ai_service import get_ai_service
+
+            ai = get_ai_service(settings)
+            loop = asyncio.new_event_loop()
+            try:
+                summary = loop.run_until_complete(
+                    ai.summarize(
+                        from_addr=parsed.from_addr or "unknown",
+                        subject=parsed.subject or "(no subject)",
+                        date=str(parsed.received_at or ""),
+                        body=parsed.snippet or "",
+                    )
+                )
+                if summary:
+                    category = summary.category
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.warning("Auto-categorize failed for message %s: %s", message_id, e)
+
     # Idempotent insert
     stmt = (
         pg_insert(ProcessedMessage)
@@ -173,6 +205,7 @@ def _process_single_message(
             snippet=parsed.snippet,
             has_attachment=parsed.has_attachment,
             label_ids=",".join(parsed.label_ids) if parsed.label_ids else None,
+            category=category,
             received_at=parsed.received_at,
         )
         .on_conflict_do_nothing(constraint="uq_user_message")
@@ -188,6 +221,33 @@ def _process_single_message(
         return
 
     session.flush()
+
+    # Auto-label in Gmail if enabled and category was detected
+    if user_pref and user_pref.auto_label_enabled and category:
+        try:
+            label_name = f"EHA/{category}"
+            loop = asyncio.new_event_loop()
+            try:
+                label_id = loop.run_until_complete(
+                    gmail.get_or_create_label(
+                        encrypted_access_token=oauth_token.encrypted_access_token,
+                        encrypted_refresh_token=oauth_token.encrypted_refresh_token,
+                        label_name=label_name,
+                    )
+                )
+                loop.run_until_complete(
+                    gmail.modify_message_labels(
+                        encrypted_access_token=oauth_token.encrypted_access_token,
+                        encrypted_refresh_token=oauth_token.encrypted_refresh_token,
+                        message_id=parsed.message_id,
+                        add_label_ids=[label_id],
+                    )
+                )
+            finally:
+                loop.close()
+            logger.info("Applied label %s to message %s", label_name, message_id)
+        except Exception as e:
+            logger.warning("Auto-label failed for message %s: %s", message_id, e)
 
     # Match against rules
     for rule_dict in rule_dicts:
@@ -212,9 +272,6 @@ def _process_single_message(
             )
 
     session.commit()
-
-    # Full body is NOT stored — it was only in memory for rule matching
-    # (body_text is not persisted in ProcessedMessage)
 
 
 @shared_task(name="app.tasks.gmail_tasks.poll_gmail_fallback")

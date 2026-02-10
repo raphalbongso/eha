@@ -32,6 +32,7 @@ class ProcessedMessage(Base):
     snippet: Mapped[str | None] = mapped_column(Text, nullable=True)
     has_attachment: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     label_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # comma-separated
+    category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     processed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

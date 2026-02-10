@@ -13,6 +13,9 @@ class NotificationType(str, Enum):
     RULE_MATCH = "RULE_MATCH"
     EVENT_PROPOSAL = "EVENT_PROPOSAL"
     SYSTEM = "SYSTEM"
+    FOLLOW_UP = "FOLLOW_UP"
+    DIGEST = "DIGEST"
+    MEETING_PREP = "MEETING_PREP"
 
 
 class PushService:

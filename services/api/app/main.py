@@ -13,7 +13,7 @@ from app.dependencies import get_session_factory, init_db, shutdown_db
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.logging import LoggingMiddleware, setup_logging
 from app.middleware.rate_limit import RateLimitMiddleware
-from app.routers import admin, ai, alerts, auth, devices, drafts, events, gmail, preferences, rules
+from app.routers import admin, ai, alerts, auth, automation, devices, drafts, events, gmail, preferences, rules
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(devices.router, prefix=prefix)
     app.include_router(events.router, prefix=prefix)
     app.include_router(preferences.router, prefix=prefix)
+    app.include_router(automation.router, prefix=prefix)
     app.include_router(admin.router, prefix=prefix)
 
     @app.get("/health")

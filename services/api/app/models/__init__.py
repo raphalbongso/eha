@@ -3,7 +3,9 @@
 from app.models.alert import Alert
 from app.models.audit_log import AuditLog
 from app.models.device_token import DeviceToken
+from app.models.digest_subscription import DigestSubscription
 from app.models.draft import Draft
+from app.models.follow_up_reminder import FollowUpReminder
 from app.models.oauth_token import OAuthToken
 from app.models.processed_message import ProcessedMessage
 from app.models.proposed_event import EventStatus, ProposedEvent
@@ -23,4 +25,6 @@ __all__ = [
     "DeviceToken",
     "AuditLog",
     "UserPreference",
+    "FollowUpReminder",
+    "DigestSubscription",
 ]
