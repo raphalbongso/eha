@@ -80,6 +80,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(slack.router, prefix=prefix)
     app.include_router(admin.router, prefix=prefix)
 
+    @app.get("/")
+    async def root():
+        return {"status": "running", "service": "eha-api", "version": "1.0.0"}
+
     @app.get("/health")
     async def health():
         return {"status": "ok", "service": "eha-api"}
