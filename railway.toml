@@ -1,5 +1,9 @@
 [build]
 dockerfilePath = "services/api/Dockerfile"
+watchPatterns = ["services/api/**"]
+
+[build.args]
+BUILD_CONTEXT = "services/api/"
 
 [deploy]
 healthcheckPath = "/health"
