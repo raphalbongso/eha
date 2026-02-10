@@ -44,7 +44,7 @@
 
 ### Data & Privacy
 - [x] Full data export endpoint (GDPR Article 20)
-- [ ] Optional email content storage (user opt-in, encrypted)
+- [x] Optional email content storage (user opt-in, encrypted)
 - [ ] User preference for AI data retention
 
 ### Platform
