@@ -70,22 +70,18 @@ def _travel_estimate(**overrides):
     return TravelEstimate(**defaults)
 
 
-def _mock_db_with_results(event=None, pref=None, tokens=None):
+def _mock_db_with_results(event=None, pref=None):
     """Create a mock async DB session that returns the given objects.
 
     Successive calls to db.execute() return the objects in order:
       1st call -> event
       2nd call -> preference
-      3rd call -> device tokens (list)
+    Notification delivery is handled by the NotificationDispatcher mock.
     """
     results = []
     for obj in [event, pref]:
         r = MagicMock()
         r.scalar_one_or_none.return_value = obj
-        results.append(r)
-    if tokens is not None:
-        r = MagicMock()
-        r.scalars.return_value.all.return_value = tokens
         results.append(r)
 
     db = AsyncMock()
@@ -213,91 +209,67 @@ class TestCalculateAndNotify:
             assert db.execute.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_skips_when_no_device_tokens(self, user_id, event_id):
-        event = _make_event(event_id, user_id)
-        pref = _make_preference(user_id)
-        db = _mock_db_with_results(event=event, pref=pref, tokens=[])
-        session_factory = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=db), __aexit__=AsyncMock(return_value=False)))
-
-        route_provider = AsyncMock()
-        route_provider.get_travel_time.return_value = _travel_estimate()
-
-        with patch("app.tasks.leave_time_tasks.get_route_provider", return_value=route_provider), \
-             patch("app.tasks.leave_time_tasks.get_settings"), \
-             patch("app.tasks.leave_time_tasks._get_async_session", return_value=session_factory), \
-             patch("app.tasks.leave_time_tasks.get_push_service") as mock_push_svc:
-            await _calculate_and_notify(user_id, event_id)
-            mock_push_svc.return_value.send.assert_not_called()
-
-    @pytest.mark.asyncio
     async def test_sends_notification_on_success(self, user_id, event_id):
         event = _make_event(event_id, user_id)
         pref = _make_preference(user_id)
-        token = _make_device_token(user_id, platform="ios", token="tok-123")
-        db = _mock_db_with_results(event=event, pref=pref, tokens=[token])
+        db = _mock_db_with_results(event=event, pref=pref)
         session_factory = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=db), __aexit__=AsyncMock(return_value=False)))
 
         route_provider = AsyncMock()
         route_provider.get_travel_time.return_value = _travel_estimate(duration_minutes=30.0, distance_km=25.0)
 
-        mock_push = AsyncMock()
+        mock_dispatcher = AsyncMock()
 
         with patch("app.tasks.leave_time_tasks.get_route_provider", return_value=route_provider), \
              patch("app.tasks.leave_time_tasks.get_settings"), \
              patch("app.tasks.leave_time_tasks._get_async_session", return_value=session_factory), \
-             patch("app.tasks.leave_time_tasks.get_push_service", return_value=mock_push):
+             patch("app.tasks.leave_time_tasks.get_notification_dispatcher", return_value=mock_dispatcher):
             await _calculate_and_notify(user_id, event_id)
 
-        mock_push.send.assert_called_once()
-        call_kwargs = mock_push.send.call_args.kwargs
-        assert call_kwargs["platform"] == "ios"
-        assert call_kwargs["token"] == "tok-123"
+        mock_dispatcher.notify.assert_called_once()
+        call_kwargs = mock_dispatcher.notify.call_args.kwargs
         assert call_kwargs["title"] == "Time to Leave"
         assert "30 min" in call_kwargs["body"]
         assert "Team Meeting" in call_kwargs["body"]
         assert "25.0 km" in call_kwargs["body"]
 
     @pytest.mark.asyncio
-    async def test_sends_to_multiple_devices(self, user_id, event_id):
+    async def test_dispatches_notification(self, user_id, event_id):
+        """Dispatcher is called once; it handles device fan-out internally."""
         event = _make_event(event_id, user_id)
         pref = _make_preference(user_id)
-        tokens = [
-            _make_device_token(user_id, platform="ios", token="tok-ios"),
-            _make_device_token(user_id, platform="android", token="tok-android"),
-        ]
-        db = _mock_db_with_results(event=event, pref=pref, tokens=tokens)
+        db = _mock_db_with_results(event=event, pref=pref)
         session_factory = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=db), __aexit__=AsyncMock(return_value=False)))
 
         route_provider = AsyncMock()
         route_provider.get_travel_time.return_value = _travel_estimate()
 
-        mock_push = AsyncMock()
+        mock_dispatcher = AsyncMock()
 
         with patch("app.tasks.leave_time_tasks.get_route_provider", return_value=route_provider), \
              patch("app.tasks.leave_time_tasks.get_settings"), \
              patch("app.tasks.leave_time_tasks._get_async_session", return_value=session_factory), \
-             patch("app.tasks.leave_time_tasks.get_push_service", return_value=mock_push):
+             patch("app.tasks.leave_time_tasks.get_notification_dispatcher", return_value=mock_dispatcher):
             await _calculate_and_notify(user_id, event_id)
 
-        assert mock_push.send.call_count == 2
+        mock_dispatcher.notify.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_uses_preferred_transport_mode(self, user_id, event_id):
         event = _make_event(event_id, user_id)
         pref = _make_preference(user_id, transport_mode="transit")
-        token = _make_device_token(user_id)
-        db = _mock_db_with_results(event=event, pref=pref, tokens=[token])
+        db = _mock_db_with_results(event=event, pref=pref)
         session_factory = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=db), __aexit__=AsyncMock(return_value=False)))
 
         route_provider = AsyncMock()
         route_provider.get_travel_time.return_value = _travel_estimate(mode="transit")
 
-        mock_push = AsyncMock()
+        mock_dispatcher = AsyncMock()
 
         with patch("app.tasks.leave_time_tasks.get_route_provider", return_value=route_provider), \
              patch("app.tasks.leave_time_tasks.get_settings"), \
              patch("app.tasks.leave_time_tasks._get_async_session", return_value=session_factory), \
-             patch("app.tasks.leave_time_tasks.get_push_service", return_value=mock_push):
+             patch("app.tasks.leave_time_tasks.get_notification_dispatcher", return_value=mock_dispatcher):
             await _calculate_and_notify(user_id, event_id)
 
         route_provider.get_travel_time.assert_called_once_with(
@@ -310,19 +282,18 @@ class TestCalculateAndNotify:
     async def test_defaults_to_driving_when_no_transport_mode(self, user_id, event_id):
         event = _make_event(event_id, user_id)
         pref = _make_preference(user_id, transport_mode=None)
-        token = _make_device_token(user_id)
-        db = _mock_db_with_results(event=event, pref=pref, tokens=[token])
+        db = _mock_db_with_results(event=event, pref=pref)
         session_factory = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=db), __aexit__=AsyncMock(return_value=False)))
 
         route_provider = AsyncMock()
         route_provider.get_travel_time.return_value = _travel_estimate()
 
-        mock_push = AsyncMock()
+        mock_dispatcher = AsyncMock()
 
         with patch("app.tasks.leave_time_tasks.get_route_provider", return_value=route_provider), \
              patch("app.tasks.leave_time_tasks.get_settings"), \
              patch("app.tasks.leave_time_tasks._get_async_session", return_value=session_factory), \
-             patch("app.tasks.leave_time_tasks.get_push_service", return_value=mock_push):
+             patch("app.tasks.leave_time_tasks.get_notification_dispatcher", return_value=mock_dispatcher):
             await _calculate_and_notify(user_id, event_id)
 
         route_provider.get_travel_time.assert_called_once_with(
@@ -335,22 +306,21 @@ class TestCalculateAndNotify:
     async def test_notification_extra_data_includes_event_id_and_travel_info(self, user_id, event_id):
         event = _make_event(event_id, user_id)
         pref = _make_preference(user_id)
-        token = _make_device_token(user_id)
-        db = _mock_db_with_results(event=event, pref=pref, tokens=[token])
+        db = _mock_db_with_results(event=event, pref=pref)
         session_factory = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=db), __aexit__=AsyncMock(return_value=False)))
 
         route_provider = AsyncMock()
         route_provider.get_travel_time.return_value = _travel_estimate(duration_minutes=45.0)
 
-        mock_push = AsyncMock()
+        mock_dispatcher = AsyncMock()
 
         with patch("app.tasks.leave_time_tasks.get_route_provider", return_value=route_provider), \
              patch("app.tasks.leave_time_tasks.get_settings"), \
              patch("app.tasks.leave_time_tasks._get_async_session", return_value=session_factory), \
-             patch("app.tasks.leave_time_tasks.get_push_service", return_value=mock_push):
+             patch("app.tasks.leave_time_tasks.get_notification_dispatcher", return_value=mock_dispatcher):
             await _calculate_and_notify(user_id, event_id)
 
-        call_kwargs = mock_push.send.call_args.kwargs
+        call_kwargs = mock_dispatcher.notify.call_args.kwargs
         extra = call_kwargs["extra_data"]
         assert extra["event_id"] == event_id
         assert extra["travel_minutes"] == "45"

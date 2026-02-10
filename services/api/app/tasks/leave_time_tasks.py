@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import get_settings
 from app.models.proposed_event import ProposedEvent
 from app.models.user_preference import UserPreference
-from app.services.push_service import NotificationType, get_push_service
+from app.services.notification_dispatcher import get_notification_dispatcher
+from app.services.push_service import NotificationType
 from app.services.route_service import get_route_provider
 
 logger = logging.getLogger(__name__)
@@ -85,34 +86,24 @@ async def _calculate_and_notify(user_id: str, event_id: str) -> None:
         if departure_dt <= now:
             logger.info("Departure time already passed for event %s; sending immediate alert", event_id)
 
-        # Send push notification
-        from app.models.device_token import DeviceToken
-
-        result = await db.execute(select(DeviceToken).where(DeviceToken.user_id == user_id))
-        tokens = result.scalars().all()
-
-        if not tokens:
-            logger.info("No device tokens for user %s", user_id[:8])
-            return
-
-        push_service = get_push_service(settings)
+        # Send notification (push + Slack)
         title_text = event_data.get("title", "Your event")
         travel_mins = int(estimate.duration_minutes)
         body = f"Leave in {travel_mins} min for {title_text} ({estimate.distance_km} km by {mode})"
 
-        for dt in tokens:
-            await push_service.send(
-                platform=dt.platform,
-                token=dt.token,
-                title="Time to Leave",
-                body=body,
-                notification_type=NotificationType.SYSTEM,
-                extra_data={
-                    "event_id": event_id,
-                    "travel_minutes": str(travel_mins),
-                    "departure_time": departure_dt.isoformat(),
-                },
-            )
+        dispatcher = get_notification_dispatcher(settings)
+        await dispatcher.notify(
+            db=db,
+            user_id=user_id,
+            title="Time to Leave",
+            body=body,
+            notification_type=NotificationType.SYSTEM,
+            extra_data={
+                "event_id": event_id,
+                "travel_minutes": str(travel_mins),
+                "departure_time": departure_dt.isoformat(),
+            },
+        )
 
         logger.info("Sent leave-time notification for event %s (travel=%d min)", event_id, travel_mins)
 

@@ -248,12 +248,14 @@ class TestFollowUpReminderResponseSchema:
 # check_follow_up_reminders task — helpers
 # ---------------------------------------------------------------------------
 
+_SENTINEL = object()
+
+
 def _build_db_for_check(
     reminders,
     oauth_token=None,
     thread_response=None,
-    processed_message=None,
-    devices=None,
+    processed_message=_SENTINEL,
 ):
     """Create a mock async DB session for check_follow_up_reminders.
 
@@ -261,8 +263,8 @@ def _build_db_for_check(
       1. SELECT reminders (pending)
       Then per-reminder:
         2. SELECT OAuthToken (for Gmail access)
-        3. SELECT ProcessedMessage (for subject)
-        4. SELECT DeviceToken (for push)
+        3. SELECT ProcessedMessage (for subject) — on triggered path
+    Notification delivery is handled by the NotificationDispatcher mock.
     """
     db = AsyncMock()
 
@@ -281,17 +283,11 @@ def _build_db_for_check(
         oauth_result.scalar_one_or_none.return_value = oauth_token
         call_results.append(oauth_result)
 
-        # ProcessedMessage lookup (only reached if no reply => triggered path)
-        if processed_message is not None:
+        # ProcessedMessage lookup (reached on triggered path — no reply found)
+        if processed_message is not _SENTINEL:
             pm_result = MagicMock()
             pm_result.scalar_one_or_none.return_value = processed_message
             call_results.append(pm_result)
-
-        # Device tokens lookup
-        if devices is not None:
-            dev_result = MagicMock()
-            dev_result.scalars.return_value.all.return_value = devices
-            call_results.append(dev_result)
 
     db.execute = AsyncMock(side_effect=call_results)
     db.flush = AsyncMock()
@@ -303,7 +299,7 @@ def _run_check(
     reminders,
     oauth_token=None,
     thread_response=None,
-    processed_message=None,
+    processed_message=_SENTINEL,
     devices=None,
     gmail_get_thread_side_effect=None,
 ):
@@ -313,7 +309,6 @@ def _run_check(
         oauth_token=oauth_token,
         thread_response=thread_response,
         processed_message=processed_message,
-        devices=devices,
     )
 
     session_factory = MagicMock(return_value=AsyncMock(
@@ -329,19 +324,20 @@ def _run_check(
     else:
         mock_gmail_instance.get_thread.return_value = {"messages": []}
 
-    mock_push = AsyncMock()
+    mock_dispatcher = AsyncMock()
+    mock_dispatcher.notify = AsyncMock(return_value={"push_sent": 1, "push_failed": 0, "slack_sent": None})
 
     with patch("app.tasks.automation_tasks._get_async_session", return_value=session_factory), \
          patch("app.tasks.automation_tasks.get_settings") as mock_settings, \
          patch("app.services.crypto_service.get_crypto_service") as mock_crypto, \
          patch("app.services.gmail_service.GmailService", return_value=mock_gmail_instance), \
-         patch("app.tasks.automation_tasks.get_push_service", return_value=mock_push):
+         patch("app.tasks.automation_tasks.get_notification_dispatcher", return_value=mock_dispatcher):
         mock_settings.return_value = MagicMock()
         mock_crypto.return_value = MagicMock()
 
         check_follow_up_reminders.__wrapped__()
 
-    return db, mock_gmail_instance, mock_push
+    return db, mock_gmail_instance, mock_dispatcher
 
 
 # ---------------------------------------------------------------------------
@@ -353,9 +349,9 @@ class TestCheckFollowUpReminders:
 
     def test_no_pending_reminders(self):
         """Task exits cleanly when there are no pending reminders."""
-        db, gmail, push = _run_check(reminders=[])
+        db, gmail, dispatcher = _run_check(reminders=[])
         gmail.get_thread.assert_not_called()
-        push.send.assert_not_called()
+        dispatcher.notify.assert_not_called()
 
     def test_skips_reminder_before_deadline(self):
         """Reminders whose deadline has not yet passed should be skipped."""
@@ -363,11 +359,11 @@ class TestCheckFollowUpReminders:
             remind_after_hours=72,
             created_at=datetime.now(timezone.utc) - timedelta(hours=10),  # 62 hours early
         )
-        db, gmail, push = _run_check(reminders=[reminder])
+        db, gmail, dispatcher = _run_check(reminders=[reminder])
 
         # Should not check Gmail since deadline is not reached
         gmail.get_thread.assert_not_called()
-        push.send.assert_not_called()
+        dispatcher.notify.assert_not_called()
         # Status should remain pending (unchanged)
         assert reminder.status == ReminderStatus.PENDING
 
@@ -377,7 +373,7 @@ class TestCheckFollowUpReminders:
             remind_after_hours=24,
             created_at=datetime.now(timezone.utc) - timedelta(hours=48),
         )
-        db, gmail, push = _run_check(
+        db, gmail, dispatcher = _run_check(
             reminders=[reminder],
             oauth_token=None,
         )
@@ -402,17 +398,17 @@ class TestCheckFollowUpReminders:
             ]
         }
 
-        db, gmail, push = _run_check(
+        db, gmail, dispatcher = _run_check(
             reminders=[reminder],
             oauth_token=oauth,
             thread_response=thread_response,
         )
 
         assert reminder.status == ReminderStatus.DISMISSED
-        push.send.assert_not_called()
+        dispatcher.notify.assert_not_called()
 
     def test_triggers_when_no_reply(self):
-        """When no reply exists, the reminder should be triggered with a push notification."""
+        """When no reply exists, the reminder should be triggered with a notification."""
         user_id = uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
         reminder = _make_reminder(
             user_id=user_id,
@@ -423,7 +419,6 @@ class TestCheckFollowUpReminders:
         )
         oauth = _make_oauth_token(user_id)
         pm = _make_processed_message(user_id, "msg_original", subject="Project Update")
-        device = _make_device_token(user_id, platform="ios", token="tok-1")
 
         thread_response = {
             "messages": [
@@ -432,20 +427,17 @@ class TestCheckFollowUpReminders:
             ]
         }
 
-        db, gmail, push = _run_check(
+        db, gmail, dispatcher = _run_check(
             reminders=[reminder],
             oauth_token=oauth,
             thread_response=thread_response,
             processed_message=pm,
-            devices=[device],
         )
 
         assert reminder.status == ReminderStatus.TRIGGERED
         assert reminder.triggered_at is not None
-        push.send.assert_called_once()
-        call_kwargs = push.send.call_args.kwargs
-        assert call_kwargs["platform"] == "ios"
-        assert call_kwargs["token"] == "tok-1"
+        dispatcher.notify.assert_called_once()
+        call_kwargs = dispatcher.notify.call_args.kwargs
         assert call_kwargs["title"] == "EHA: No reply received"
         assert "Project Update" in call_kwargs["body"]
         assert call_kwargs["extra_data"]["thread_id"] == "thread_abc"
@@ -461,24 +453,22 @@ class TestCheckFollowUpReminders:
             created_at=datetime.now(timezone.utc) - timedelta(hours=48),
         )
         oauth = _make_oauth_token(user_id)
-        device = _make_device_token(user_id)
 
         thread_response = {"messages": [{"id": "msg_original"}]}
 
-        db, gmail, push = _run_check(
+        db, gmail, dispatcher = _run_check(
             reminders=[reminder],
             oauth_token=oauth,
             thread_response=thread_response,
             processed_message=None,
-            devices=[device],
         )
 
         assert reminder.status == ReminderStatus.TRIGGERED
-        call_kwargs = push.send.call_args.kwargs
+        call_kwargs = dispatcher.notify.call_args.kwargs
         assert "(unknown subject)" in call_kwargs["body"]
 
     def test_sends_to_multiple_devices(self):
-        """Push notifications should be sent to every registered device."""
+        """Notification should be dispatched (dispatcher handles device fan-out)."""
         user_id = uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
         reminder = _make_reminder(
             user_id=user_id,
@@ -488,24 +478,18 @@ class TestCheckFollowUpReminders:
         )
         oauth = _make_oauth_token(user_id)
         pm = _make_processed_message(user_id, "msg_original")
-        devices = [
-            _make_device_token(user_id, platform="ios", token="tok-ios"),
-            _make_device_token(user_id, platform="android", token="tok-android"),
-        ]
 
         thread_response = {"messages": [{"id": "msg_original"}]}
 
-        db, gmail, push = _run_check(
+        db, gmail, dispatcher = _run_check(
             reminders=[reminder],
             oauth_token=oauth,
             thread_response=thread_response,
             processed_message=pm,
-            devices=devices,
         )
 
-        assert push.send.call_count == 2
-        platforms_notified = {c.kwargs["platform"] for c in push.send.call_args_list}
-        assert platforms_notified == {"ios", "android"}
+        # Dispatcher is called once per reminder; it handles device fan-out internally
+        dispatcher.notify.assert_called_once()
 
     def test_continues_on_gmail_api_error(self):
         """If Gmail API call fails, the reminder is skipped (not crashed)."""
@@ -518,7 +502,7 @@ class TestCheckFollowUpReminders:
         )
         oauth = _make_oauth_token(user_id)
 
-        db, gmail, push = _run_check(
+        db, gmail, dispatcher = _run_check(
             reminders=[reminder],
             oauth_token=oauth,
             gmail_get_thread_side_effect=Exception("Gmail API unavailable"),
@@ -526,7 +510,7 @@ class TestCheckFollowUpReminders:
 
         # Status should remain unchanged (skipped)
         assert reminder.status == ReminderStatus.PENDING
-        push.send.assert_not_called()
+        dispatcher.notify.assert_not_called()
 
     def test_thread_with_only_prior_messages_does_not_dismiss(self):
         """Messages before the original do NOT count as replies."""
@@ -539,7 +523,6 @@ class TestCheckFollowUpReminders:
         )
         oauth = _make_oauth_token(user_id)
         pm = _make_processed_message(user_id, "msg_original")
-        device = _make_device_token(user_id)
 
         # msg_prior comes before msg_original in the thread
         thread_response = {
@@ -549,17 +532,16 @@ class TestCheckFollowUpReminders:
             ]
         }
 
-        db, gmail, push = _run_check(
+        db, gmail, dispatcher = _run_check(
             reminders=[reminder],
             oauth_token=oauth,
             thread_response=thread_response,
             processed_message=pm,
-            devices=[device],
         )
 
         # No reply after original, so it should be triggered, not dismissed
         assert reminder.status == ReminderStatus.TRIGGERED
-        push.send.assert_called_once()
+        dispatcher.notify.assert_called_once()
 
     def test_empty_thread_triggers_notification(self):
         """If thread is empty (no messages at all), treat as no reply."""
@@ -572,20 +554,18 @@ class TestCheckFollowUpReminders:
         )
         oauth = _make_oauth_token(user_id)
         pm = _make_processed_message(user_id, "msg_original")
-        device = _make_device_token(user_id)
 
         thread_response = {"messages": []}
 
-        db, gmail, push = _run_check(
+        db, gmail, dispatcher = _run_check(
             reminders=[reminder],
             oauth_token=oauth,
             thread_response=thread_response,
             processed_message=pm,
-            devices=[device],
         )
 
         assert reminder.status == ReminderStatus.TRIGGERED
-        push.send.assert_called_once()
+        dispatcher.notify.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -615,14 +595,14 @@ class TestAutoDismissOnReply:
             ]
         }
 
-        db, gmail, push = _run_check(
+        db, gmail, dispatcher = _run_check(
             reminders=[reminder],
             oauth_token=oauth,
             thread_response=thread_response,
         )
 
         assert reminder.status == ReminderStatus.DISMISSED
-        push.send.assert_not_called()
+        dispatcher.notify.assert_not_called()
 
     def test_dismiss_only_checks_messages_after_original(self):
         """Prior messages should be ignored; only messages after original matter."""
@@ -635,7 +615,6 @@ class TestAutoDismissOnReply:
         )
         oauth = _make_oauth_token(user_id)
         pm = _make_processed_message(user_id, "msg_original")
-        device = _make_device_token(user_id)
 
         # Three messages before original, none after
         thread_response = {
@@ -647,17 +626,16 @@ class TestAutoDismissOnReply:
             ]
         }
 
-        db, gmail, push = _run_check(
+        db, gmail, dispatcher = _run_check(
             reminders=[reminder],
             oauth_token=oauth,
             thread_response=thread_response,
             processed_message=pm,
-            devices=[device],
         )
 
         # No reply after original => trigger, not dismiss
         assert reminder.status == ReminderStatus.TRIGGERED
-        push.send.assert_called_once()
+        dispatcher.notify.assert_called_once()
 
     def test_original_not_in_thread_triggers(self):
         """If the original message_id is absent from the thread, treat as no reply."""
@@ -670,7 +648,6 @@ class TestAutoDismissOnReply:
         )
         oauth = _make_oauth_token(user_id)
         pm = _make_processed_message(user_id, "msg_original")
-        device = _make_device_token(user_id)
 
         thread_response = {
             "messages": [
@@ -679,14 +656,13 @@ class TestAutoDismissOnReply:
             ]
         }
 
-        db, gmail, push = _run_check(
+        db, gmail, dispatcher = _run_check(
             reminders=[reminder],
             oauth_token=oauth,
             thread_response=thread_response,
             processed_message=pm,
-            devices=[device],
         )
 
         # Original not found, found_original stays False, so has_reply stays False
         assert reminder.status == ReminderStatus.TRIGGERED
-        push.send.assert_called_once()
+        dispatcher.notify.assert_called_once()

@@ -10,6 +10,7 @@ from app.models.oauth_token import OAuthToken
 from app.models.processed_message import ProcessedMessage
 from app.models.proposed_event import EventStatus, ProposedEvent
 from app.models.rule import Rule
+from app.models.slack_config import SlackConfig
 from app.models.user import User
 from app.models.user_preference import UserPreference
 
@@ -27,4 +28,5 @@ __all__ = [
     "UserPreference",
     "FollowUpReminder",
     "DigestSubscription",
+    "SlackConfig",
 ]

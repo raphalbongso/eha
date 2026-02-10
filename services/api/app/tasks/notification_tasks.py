@@ -1,14 +1,17 @@
 """Celery tasks for push notifications."""
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
 from celery import shared_task
 from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config import get_settings
 from app.models.device_token import DeviceToken
-from app.services.push_service import NotificationType, PushService
+from app.services.notification_dispatcher import get_notification_dispatcher
+from app.services.push_service import NotificationType
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,12 @@ def _get_sync_session():
     sync_url = settings.database_url.replace("+asyncpg", "+psycopg2").replace("postgresql+asyncpg", "postgresql")
     engine = create_engine(sync_url)
     return sessionmaker(bind=engine)()
+
+
+def _get_async_session() -> async_sessionmaker:
+    settings = get_settings()
+    engine = create_async_engine(settings.database_url, echo=False)
+    return async_sessionmaker(engine, expire_on_commit=False)
 
 
 @shared_task(
@@ -40,56 +49,32 @@ def send_push_for_alert(
     from_addr: str,
     rule_name: str,
 ):
-    """Send push notifications for a rule match alert."""
-    import asyncio
+    """Send notifications (push + Slack) for a rule match alert."""
     import uuid
 
-    settings = get_settings()
-    session = _get_sync_session()
+    async def _send():
+        settings = get_settings()
+        dispatcher = get_notification_dispatcher(settings)
+        session_factory = _get_async_session()
+        async with session_factory() as db:
+            user_uuid = uuid.UUID(user_id)
+            title = f"EHA: {rule_name}"
+            body = f"From: {from_addr}\n{subject}"
 
-    try:
-        user_uuid = uuid.UUID(user_id)
+            await dispatcher.notify(
+                db=db,
+                user_id=user_uuid,
+                title=title,
+                body=body,
+                notification_type=NotificationType.RULE_MATCH,
+                extra_data={
+                    "alert_id": alert_id,
+                    "message_subject": subject,
+                },
+            )
+            await db.commit()
 
-        # Get all device tokens for this user
-        devices = session.execute(select(DeviceToken).where(DeviceToken.user_id == user_uuid)).scalars().all()
-
-        if not devices:
-            logger.debug("No device tokens for user=%s", user_id)
-            return
-
-        push = PushService(settings)
-        title = f"EHA: {rule_name}"
-        body = f"From: {from_addr}\n{subject}"
-
-        loop = asyncio.new_event_loop()
-        try:
-            for device in devices:
-                success = loop.run_until_complete(
-                    push.send(
-                        platform=device.platform,
-                        token=device.token,
-                        title=title,
-                        body=body,
-                        notification_type=NotificationType.RULE_MATCH,
-                        extra_data={
-                            "alert_id": alert_id,
-                            "message_subject": subject,
-                        },
-                    )
-                )
-                if success:
-                    device.last_used = datetime.now(timezone.utc)
-
-            session.commit()
-        finally:
-            loop.close()
-
-    except Exception as e:
-        session.rollback()
-        logger.error("Push notification failed: %s", e)
-        raise
-    finally:
-        session.close()
+    asyncio.run(_send())
 
 
 @shared_task(
@@ -103,48 +88,30 @@ def send_event_proposal_push(
     event_title: str,
     confidence: float,
 ):
-    """Send push notification for a proposed calendar event."""
-    import asyncio
+    """Send notifications (push + Slack) for a proposed calendar event."""
     import uuid
 
-    settings = get_settings()
-    session = _get_sync_session()
+    async def _send():
+        settings = get_settings()
+        dispatcher = get_notification_dispatcher(settings)
+        session_factory = _get_async_session()
+        async with session_factory() as db:
+            user_uuid = uuid.UUID(user_id)
+            confidence_note = " (low confidence)" if confidence < 0.5 else ""
+            title = "EHA: New event detected"
+            body = f"{event_title}{confidence_note}"
 
-    try:
-        user_uuid = uuid.UUID(user_id)
-        devices = session.execute(select(DeviceToken).where(DeviceToken.user_id == user_uuid)).scalars().all()
+            await dispatcher.notify(
+                db=db,
+                user_id=user_uuid,
+                title=title,
+                body=body,
+                notification_type=NotificationType.EVENT_PROPOSAL,
+                extra_data={"event_title": event_title},
+            )
+            await db.commit()
 
-        if not devices:
-            return
-
-        push = PushService(settings)
-        confidence_note = " (low confidence)" if confidence < 0.5 else ""
-        title = "EHA: New event detected"
-        body = f"{event_title}{confidence_note}"
-
-        loop = asyncio.new_event_loop()
-        try:
-            for device in devices:
-                loop.run_until_complete(
-                    push.send(
-                        platform=device.platform,
-                        token=device.token,
-                        title=title,
-                        body=body,
-                        notification_type=NotificationType.EVENT_PROPOSAL,
-                        extra_data={"event_title": event_title},
-                    )
-                )
-        finally:
-            loop.close()
-
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        logger.error("Event push failed: %s", e)
-        raise
-    finally:
-        session.close()
+    asyncio.run(_send())
 
 
 @shared_task(name="app.tasks.notification_tasks.cleanup_stale_device_tokens")

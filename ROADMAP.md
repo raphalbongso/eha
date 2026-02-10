@@ -65,7 +65,7 @@
 
 ### Integrations
 - [ ] Microsoft Outlook / Office 365 support
-- [ ] Slack notifications as alternative to push
+- [x] Slack notifications as alternative to push
 - [ ] Todoist / Notion task creation from action items
 - [ ] Google Calendar two-way sync
 

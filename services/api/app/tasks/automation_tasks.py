@@ -10,13 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.config import get_settings
 from app.models.alert import Alert
-from app.models.device_token import DeviceToken
 from app.models.digest_subscription import DigestSubscription
 from app.models.follow_up_reminder import FollowUpReminder, ReminderStatus
 from app.models.oauth_token import OAuthToken
 from app.models.processed_message import ProcessedMessage
 from app.models.proposed_event import ProposedEvent
-from app.services.push_service import NotificationType, get_push_service
+from app.services.notification_dispatcher import get_notification_dispatcher
+from app.services.push_service import NotificationType
 
 logger = logging.getLogger(__name__)
 
@@ -143,25 +143,19 @@ def check_follow_up_reminders():
                 pm = pm_result.scalar_one_or_none()
                 subject = pm.subject if pm else "(unknown subject)"
 
-                # Send push notification
-                devices_result = await db.execute(
-                    select(DeviceToken).where(DeviceToken.user_id == reminder.user_id)
+                # Send notification (push + Slack)
+                dispatcher = get_notification_dispatcher(settings)
+                await dispatcher.notify(
+                    db=db,
+                    user_id=reminder.user_id,
+                    title="EHA: No reply received",
+                    body=f"No reply to: {subject}",
+                    notification_type=NotificationType.FOLLOW_UP,
+                    extra_data={
+                        "reminder_id": str(reminder.id),
+                        "thread_id": reminder.thread_id,
+                    },
                 )
-                devices = devices_result.scalars().all()
-
-                push = get_push_service(settings)
-                for device in devices:
-                    await push.send(
-                        platform=device.platform,
-                        token=device.token,
-                        title="EHA: No reply received",
-                        body=f"No reply to: {subject}",
-                        notification_type=NotificationType.FOLLOW_UP,
-                        extra_data={
-                            "reminder_id": str(reminder.id),
-                            "thread_id": reminder.thread_id,
-                        },
-                    )
 
             await db.commit()
 
@@ -257,26 +251,20 @@ def generate_meeting_prep_task(user_id: str, event_id: str):
                 logger.warning("AI meeting prep generation failed for event %s", event_id)
                 return
 
-            # Send push notification with summary
-            devices_result = await db.execute(
-                select(DeviceToken).where(DeviceToken.user_id == user_uuid)
-            )
-            devices = devices_result.scalars().all()
-
-            push = get_push_service(settings)
+            # Send notification (push + Slack)
+            dispatcher = get_notification_dispatcher(settings)
             body = f"{title}: {prep.agenda_context[:200]}"
-            for device in devices:
-                await push.send(
-                    platform=device.platform,
-                    token=device.token,
-                    title="EHA: Meeting Prep",
-                    body=body,
-                    notification_type=NotificationType.MEETING_PREP,
-                    extra_data={
-                        "event_id": event_id,
-                        "discussion_points": str(len(prep.key_discussion_points)),
-                    },
-                )
+            await dispatcher.notify(
+                db=db,
+                user_id=user_uuid,
+                title="EHA: Meeting Prep",
+                body=body,
+                notification_type=NotificationType.MEETING_PREP,
+                extra_data={
+                    "event_id": event_id,
+                    "discussion_points": str(len(prep.key_discussion_points)),
+                },
+            )
 
             logger.info("Sent meeting prep for event %s", event_id)
 
@@ -418,23 +406,17 @@ def send_digest_notifications():
                     logger.warning("Digest AI generation failed for user %s: %s", sub.user_id, e)
                     digest = None
 
-                # Send push notification
+                # Send notification (push + Slack)
                 body = digest.summary if digest else f"You have {len(alerts)} new alerts."
-                devices_result = await db.execute(
-                    select(DeviceToken).where(DeviceToken.user_id == sub.user_id)
+                dispatcher = get_notification_dispatcher(settings)
+                await dispatcher.notify(
+                    db=db,
+                    user_id=sub.user_id,
+                    title=f"EHA: {'Daily' if sub.frequency == 'daily' else 'Weekly'} Digest",
+                    body=body[:500],
+                    notification_type=NotificationType.DIGEST,
+                    extra_data={"alert_count": str(len(alerts))},
                 )
-                devices = devices_result.scalars().all()
-
-                push = get_push_service(settings)
-                for device in devices:
-                    await push.send(
-                        platform=device.platform,
-                        token=device.token,
-                        title=f"EHA: {'Daily' if sub.frequency == 'daily' else 'Weekly'} Digest",
-                        body=body[:500],
-                        notification_type=NotificationType.DIGEST,
-                        extra_data={"alert_count": str(len(alerts))},
-                    )
 
                 sub.last_sent_at = now
                 await db.flush()
