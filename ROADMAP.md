@@ -43,7 +43,7 @@
 - [x] Email categorization (invoices, meetings, newsletters, action-required)
 
 ### Data & Privacy
-- [ ] Full data export endpoint (GDPR Article 20)
+- [x] Full data export endpoint (GDPR Article 20)
 - [ ] Optional email content storage (user opt-in, encrypted)
 - [ ] User preference for AI data retention
 
