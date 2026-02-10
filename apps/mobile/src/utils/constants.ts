@@ -1,8 +1,13 @@
 /** Application constants. */
+import Constants from 'expo-constants';
 
-export const API_BASE_URL = __DEV__
-  ? 'http://localhost:8000/api/v1'
-  : 'https://api.eha.app/api/v1';
+const configApiUrl = Constants.expoConfig?.extra?.apiBaseUrl as string | null;
+
+export const API_BASE_URL = configApiUrl
+  ? `${configApiUrl}/api/v1`
+  : __DEV__
+    ? 'http://localhost:8000/api/v1'
+    : 'https://api.eha.app/api/v1';
 
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'eha_access_token',

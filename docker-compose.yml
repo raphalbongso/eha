@@ -5,6 +5,7 @@ services:
     build:
       context: ./services/api
       dockerfile: Dockerfile
+    command: ["--reload"]
     ports:
       - "8000:8000"
     env_file:

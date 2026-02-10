@@ -12,4 +12,10 @@ if [ -n "${PROMETHEUS_MULTIPROC_DIR:-}" ]; then
 fi
 
 echo "Starting uvicorn..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 "$@"
+if [ "${APP_ENV:-development}" = "production" ]; then
+    echo "Running in production mode (workers=2)"
+    exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 "$@"
+else
+    echo "Running in development mode"
+    exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} "$@"
+fi
