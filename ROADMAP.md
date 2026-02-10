@@ -58,10 +58,10 @@
 ## v3.0 — Automation & Integrations
 
 ### Smart Automation
-- [ ] Auto-categorize and label emails (with user approval)
-- [ ] Follow-up reminders ("No reply in 3 days")
-- [ ] Meeting prep summaries (aggregate emails related to upcoming meetings)
-- [ ] Digest emails (daily/weekly summary of matched rules)
+- [x] Auto-categorize and label emails (with user approval)
+- [x] Follow-up reminders ("No reply in 3 days")
+- [x] Meeting prep summaries (aggregate emails related to upcoming meetings)
+- [x] Digest emails (daily/weekly summary of matched rules)
 
 ### Integrations
 - [ ] Microsoft Outlook / Office 365 support
