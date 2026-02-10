@@ -82,11 +82,13 @@ class TestHealthEndpoints:
         assert body["service"] == "eha-api"
 
     def test_metrics_endpoint(self, client):
+        # Hit a non-excluded endpoint first to generate HTTP metrics
+        client.get("/health")
         response = client.get("/metrics")
         assert response.status_code == 200
         assert "text/plain" in response.headers.get("content-type", "")
         body = response.text
-        assert "http_request_duration_seconds" in body or "http_requests" in body
+        assert "http_request_duration" in body
 
 
 class TestCORSHeaders:
