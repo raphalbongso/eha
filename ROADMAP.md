@@ -45,7 +45,7 @@
 ### Data & Privacy
 - [x] Full data export endpoint (GDPR Article 20)
 - [x] Optional email content storage (user opt-in, encrypted)
-- [ ] User preference for AI data retention
+- [x] User preference for AI data retention
 
 ### Platform
 - [ ] Prometheus + Grafana metrics dashboard
