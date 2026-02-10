@@ -29,6 +29,10 @@ class UserPreference(Base, TimestampMixin):
     auto_label_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
     )
+    # v2: Data & Privacy — opt-in email content storage
+    store_email_content: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="preferences")

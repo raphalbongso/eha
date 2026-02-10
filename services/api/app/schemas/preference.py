@@ -11,6 +11,7 @@ class PreferenceResponse(BaseModel):
     preferred_transport_mode: str | None = "driving"
     auto_categorize_enabled: bool = False
     auto_label_enabled: bool = False
+    store_email_content: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -21,3 +22,4 @@ class PreferenceUpdate(BaseModel):
     preferred_transport_mode: Literal["driving", "transit", "cycling", "walking"] | None = None
     auto_categorize_enabled: bool | None = None
     auto_label_enabled: bool | None = None
+    store_email_content: bool | None = None

@@ -169,6 +169,16 @@ def _process_single_message(
 
     parsed = parse_gmail_message(raw_msg)
 
+    # Encrypt email content if user opted in
+    encrypted_body_text = None
+    encrypted_body_html = None
+    if user_pref and user_pref.store_email_content:
+        crypto = get_crypto_service(settings)
+        if parsed.body_text:
+            encrypted_body_text = crypto.encrypt(parsed.body_text)
+        if parsed.body_html:
+            encrypted_body_html = crypto.encrypt(parsed.body_html)
+
     # Auto-categorize via AI if enabled
     category = None
     if user_pref and user_pref.auto_categorize_enabled:
@@ -207,6 +217,8 @@ def _process_single_message(
             label_ids=",".join(parsed.label_ids) if parsed.label_ids else None,
             category=category,
             received_at=parsed.received_at,
+            encrypted_body_text=encrypted_body_text,
+            encrypted_body_html=encrypted_body_html,
         )
         .on_conflict_do_nothing(constraint="uq_user_message")
         .returning(ProcessedMessage.id)

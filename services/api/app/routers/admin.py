@@ -86,10 +86,22 @@ async def delete_user_data(
     return {"status": "ok", "detail": "All user data deleted"}
 
 
-def _serialize_row(obj: object) -> dict:
+# Encrypted byte columns that should be decrypted in data exports
+_DECRYPT_COLUMNS = {"encrypted_body_text", "encrypted_body_html"}
+
+# Friendly export names (strip "encrypted_" prefix)
+_DECRYPT_EXPORT_NAMES = {
+    "encrypted_body_text": "body_text",
+    "encrypted_body_html": "body_html",
+}
+
+
+def _serialize_row(obj: object, decrypt_fn=None) -> dict:
     """Convert a SQLAlchemy model instance to a JSON-safe dict.
 
     Handles UUIDs, datetimes, enums, JSONB, and skips encrypted binary columns.
+    If decrypt_fn is provided, columns in _DECRYPT_COLUMNS are decrypted and
+    included under friendly names (e.g. encrypted_body_text -> body_text).
     """
     result = {}
     mapper = type(obj).__mapper__  # type: ignore[attr-defined]
@@ -97,7 +109,9 @@ def _serialize_row(obj: object) -> dict:
         key = col.key
         value = getattr(obj, key)
         if isinstance(value, bytes):
-            # Skip encrypted binary columns (oauth tokens, webhook URLs)
+            if key in _DECRYPT_COLUMNS and decrypt_fn is not None:
+                result[_DECRYPT_EXPORT_NAMES[key]] = decrypt_fn(value)
+            # Skip all other encrypted binary columns (oauth tokens, webhook URLs)
             continue
         if isinstance(value, uuid.UUID):
             value = str(value)
@@ -111,16 +125,19 @@ def _serialize_row(obj: object) -> dict:
     return result
 
 
-async def _query_rows(db: AsyncSession, model: type, user_id: uuid.UUID) -> list[dict]:
+async def _query_rows(
+    db: AsyncSession, model: type, user_id: uuid.UUID, decrypt_fn=None
+) -> list[dict]:
     """Query all rows for a model filtered by user_id and serialize them."""
     result = await db.execute(select(model).where(model.user_id == user_id))
-    return [_serialize_row(row) for row in result.scalars().all()]
+    return [_serialize_row(row, decrypt_fn=decrypt_fn) for row in result.scalars().all()]
 
 
 @router.get("/me/export")
 async def export_user_data(
     user_id: uuid.UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ):
     """Export all user data as a downloadable JSON file (GDPR Article 20)."""
     # Fetch user profile
@@ -129,6 +146,11 @@ async def export_user_data(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Set up decryption for email content columns
+    from app.services.crypto_service import get_crypto_service
+
+    crypto = get_crypto_service(settings)
+
     # Build export payload
     export_data = {
         "exported_at": datetime.utcnow().isoformat() + "Z",
@@ -136,7 +158,9 @@ async def export_user_data(
         "rules": await _query_rows(db, Rule, user_id),
         "alerts": await _query_rows(db, Alert, user_id),
         "drafts": await _query_rows(db, Draft, user_id),
-        "processed_messages": await _query_rows(db, ProcessedMessage, user_id),
+        "processed_messages": await _query_rows(
+            db, ProcessedMessage, user_id, decrypt_fn=crypto.decrypt
+        ),
         "proposed_events": await _query_rows(db, ProposedEvent, user_id),
         "user_preferences": await _query_rows(db, UserPreference, user_id),
         "follow_up_reminders": await _query_rows(db, FollowUpReminder, user_id),

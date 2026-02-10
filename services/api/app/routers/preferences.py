@@ -50,6 +50,8 @@ async def update_preferences(
         pref.auto_categorize_enabled = body.auto_categorize_enabled
     if body.auto_label_enabled is not None:
         pref.auto_label_enabled = body.auto_label_enabled
+    if body.store_email_content is not None:
+        pref.store_email_content = body.store_email_content
 
     await db.flush()
     return PreferenceResponse.model_validate(pref)

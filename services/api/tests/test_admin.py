@@ -9,7 +9,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.routers.admin import router, _serialize_row
+from app.routers.admin import router, _serialize_row, _DECRYPT_COLUMNS
 
 TEST_USER_ID = uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 
@@ -323,3 +323,66 @@ class TestSerializeRow:
 
         result = _serialize_row(obj)
         assert result["conditions"] == obj.conditions
+
+    def test_encrypted_email_content_decrypted_with_decrypt_fn(self):
+        """Encrypted body columns are decrypted and exported as body_text/body_html."""
+        obj = MagicMock()
+        obj.message_id = "msg_001"
+        obj.encrypted_body_text = b"encrypted-text"
+        obj.encrypted_body_html = b"encrypted-html"
+
+        cols = []
+        for key in ("message_id", "encrypted_body_text", "encrypted_body_html"):
+            col = MagicMock()
+            col.key = key
+            cols.append(col)
+        type(obj).__mapper__ = MagicMock()
+        type(obj).__mapper__.columns = cols
+
+        def mock_decrypt(ciphertext: bytes) -> str:
+            return ciphertext.decode("utf-8").replace("encrypted-", "decrypted-")
+
+        result = _serialize_row(obj, decrypt_fn=mock_decrypt)
+        assert result["message_id"] == "msg_001"
+        assert result["body_text"] == "decrypted-text"
+        assert result["body_html"] == "decrypted-html"
+        # Original encrypted column names should not appear
+        assert "encrypted_body_text" not in result
+        assert "encrypted_body_html" not in result
+
+    def test_encrypted_email_content_skipped_without_decrypt_fn(self):
+        """Without decrypt_fn, encrypted body columns are skipped like other bytes."""
+        obj = MagicMock()
+        obj.message_id = "msg_001"
+        obj.encrypted_body_text = b"encrypted-text"
+
+        cols = []
+        for key in ("message_id", "encrypted_body_text"):
+            col = MagicMock()
+            col.key = key
+            cols.append(col)
+        type(obj).__mapper__ = MagicMock()
+        type(obj).__mapper__.columns = cols
+
+        result = _serialize_row(obj)
+        assert "encrypted_body_text" not in result
+        assert "body_text" not in result
+        assert result["message_id"] == "msg_001"
+
+    def test_encrypted_email_content_none_excluded(self):
+        """When encrypted content is None (not bytes), it's included as None."""
+        obj = MagicMock()
+        obj.message_id = "msg_001"
+        obj.encrypted_body_text = None
+
+        cols = []
+        for key in ("message_id", "encrypted_body_text"):
+            col = MagicMock()
+            col.key = key
+            cols.append(col)
+        type(obj).__mapper__ = MagicMock()
+        type(obj).__mapper__.columns = cols
+
+        result = _serialize_row(obj, decrypt_fn=lambda x: x.decode())
+        # None is not bytes, so it goes through normal path
+        assert result["encrypted_body_text"] is None

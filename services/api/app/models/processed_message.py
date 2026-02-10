@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -39,6 +39,9 @@ class ProcessedMessage(Base):
         server_default="now()",
         nullable=False,
     )
+    # v2: Optional encrypted email content (user opt-in)
+    encrypted_body_text: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    encrypted_body_html: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
     def __repr__(self) -> str:
         return f"<ProcessedMessage {self.message_id} user_id={self.user_id}>"
