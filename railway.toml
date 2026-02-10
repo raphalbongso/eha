@@ -3,6 +3,4 @@ dockerfilePath = "services/api/Dockerfile"
 watchPatterns = ["services/api/**"]
 
 [deploy]
-healthcheckPath = "/health"
-healthcheckTimeout = 30
 restartPolicyType = "on_failure"
