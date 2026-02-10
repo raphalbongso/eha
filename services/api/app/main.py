@@ -85,7 +85,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/")
     async def root():
-        return {"status": "running", "service": "eha-api", "version": "1.0.0"}
+        return {"status": "running", "service": "eha-api", "version": "1.1.0"}
 
     @app.get("/health")
     async def health():
