@@ -1,10 +1,15 @@
 """Integration tests: API app creation, middleware stack, endpoint routing."""
 
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import Settings
+from app.config import Settings, get_settings
+from app.dependencies import get_current_user_id
 from app.main import create_app
+
+FAKE_USER_ID = uuid.uuid4()
 
 
 @pytest.fixture
@@ -29,12 +34,26 @@ def production_settings():
 
 @pytest.fixture
 def app(settings):
-    return create_app(settings)
+    app = create_app(settings)
+    app.dependency_overrides[get_settings] = lambda: settings
+    return app
+
+
+@pytest.fixture
+def authed_app(app):
+    app.dependency_overrides[get_current_user_id] = lambda: FAKE_USER_ID
+    yield app
+    app.dependency_overrides.pop(get_current_user_id, None)
 
 
 @pytest.fixture
 def client(app):
     return TestClient(app)
+
+
+@pytest.fixture
+def authed_client(authed_app):
+    return TestClient(authed_app)
 
 
 class TestAppFactory:
@@ -115,8 +134,8 @@ class TestRouterRegistration:
 
 
 class TestInputValidation:
-    def test_rules_create_name_too_long(self, client):
-        response = client.post(
+    def test_rules_create_name_too_long(self, authed_client):
+        response = authed_client.post(
             "/api/v1/rules",
             json={
                 "name": "x" * 256,
@@ -126,8 +145,8 @@ class TestInputValidation:
         )
         assert response.status_code == 422
 
-    def test_rules_create_empty_name(self, client):
-        response = client.post(
+    def test_rules_create_empty_name(self, authed_client):
+        response = authed_client.post(
             "/api/v1/rules",
             json={
                 "name": "",
@@ -137,9 +156,9 @@ class TestInputValidation:
         )
         assert response.status_code == 422
 
-    def test_rules_create_too_many_conditions(self, client):
+    def test_rules_create_too_many_conditions(self, authed_client):
         conditions = [{"type": "from_contains", "value": f"test{i}"} for i in range(21)]
-        response = client.post(
+        response = authed_client.post(
             "/api/v1/rules",
             json={
                 "name": "test",

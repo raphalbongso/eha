@@ -2,13 +2,13 @@
 
 import json
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
 
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.main import create_app
 from app.routers.auth import _create_jwt
 
@@ -29,7 +29,9 @@ def settings():
 
 @pytest.fixture
 def app(settings):
-    return create_app(settings)
+    app = create_app(settings)
+    app.dependency_overrides[get_settings] = lambda: settings
+    return app
 
 
 @pytest.fixture
@@ -94,7 +96,7 @@ class TestPKCEStateStore:
 
         mock_redis = AsyncMock()
         mock_pipeline = AsyncMock()
-        mock_redis.pipeline.return_value = mock_pipeline
+        mock_redis.pipeline = MagicMock(return_value=mock_pipeline)
 
         stored_data = {"code_verifier": "test-verifier", "created_at": "2024-01-01T00:00:00"}
         mock_pipeline.execute.return_value = [json.dumps(stored_data), 1]
@@ -112,7 +114,7 @@ class TestPKCEStateStore:
 
         mock_redis = AsyncMock()
         mock_pipeline = AsyncMock()
-        mock_redis.pipeline.return_value = mock_pipeline
+        mock_redis.pipeline = MagicMock(return_value=mock_pipeline)
         mock_pipeline.execute.return_value = [None, 0]
 
         with patch("app.routers.auth._get_redis", return_value=mock_redis):

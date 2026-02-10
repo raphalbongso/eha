@@ -1,6 +1,6 @@
 """Unit tests for rate limiting middleware."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -42,7 +42,7 @@ class TestRateLimitMiddleware:
         """Authenticated requests should get rate limit headers."""
         mock_redis = AsyncMock()
         mock_pipe = AsyncMock()
-        mock_redis.pipeline.return_value = mock_pipe
+        mock_redis.pipeline = MagicMock(return_value=mock_pipe)
         mock_pipe.execute.return_value = [0, 1, True, True]  # zremrangebyscore, zcard, zadd, expire
 
         with patch("app.middleware.rate_limit.RateLimitMiddleware._get_redis", return_value=mock_redis):
@@ -57,7 +57,7 @@ class TestRateLimitMiddleware:
         """Unauthenticated requests fall back to IP-based limiting."""
         mock_redis = AsyncMock()
         mock_pipe = AsyncMock()
-        mock_redis.pipeline.return_value = mock_pipe
+        mock_redis.pipeline = MagicMock(return_value=mock_pipe)
         mock_pipe.execute.return_value = [0, 0, True, True]
 
         with patch("app.middleware.rate_limit.RateLimitMiddleware._get_redis", return_value=mock_redis):

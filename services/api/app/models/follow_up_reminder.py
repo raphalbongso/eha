@@ -42,4 +42,4 @@ class FollowUpReminder(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     user: Mapped["User"] = relationship("User")
 
     def __repr__(self) -> str:
-        return f"<FollowUpReminder {self.id} status={self.status}>"
+        return f"<FollowUpReminder {self.id} status={self.status.value}>"

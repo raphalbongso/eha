@@ -87,7 +87,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             response.headers["X-RateLimit-Remaining"] = str(max(0, self._max_requests - request_count - 1))
             return response
 
-        except redis.RedisError as e:
+        except Exception as e:
             # If Redis is down, allow the request (fail open)
             logger.warning("Rate limit Redis error: %s", e)
             return await call_next(request)
