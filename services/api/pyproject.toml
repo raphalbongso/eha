@@ -33,6 +33,8 @@ dependencies = [
     "firebase-admin>=6.4.0",
     "aioapns>=3.0",
     "tenacity>=8.2.3",
+    "prometheus-client>=0.20.0",
+    "prometheus-fastapi-instrumentator>=7.0.0",
 ]
 
 [project.optional-dependencies]

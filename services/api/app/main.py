@@ -1,11 +1,14 @@
 """EHA FastAPI application factory."""
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import text
 
 from app.config import Settings, get_settings
@@ -114,10 +117,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content={"status": "ready" if all_ok else "degraded", "checks": checks},
         )
 
-    @app.get("/metrics")
+    # Prometheus instrumentation
+    instrumentator = Instrumentator(
+        excluded_handlers=["/health", "/health/ready", "/docs", "/redoc", "/openapi.json", "/metrics"],
+    )
+    instrumentator.instrument(app)
+
+    @app.get("/metrics", include_in_schema=False)
     async def metrics():
-        """Prometheus-compatible metrics endpoint stub."""
-        return {"status": "ok", "detail": "Metrics endpoint - integrate prometheus_fastapi_instrumentator"}
+        """Prometheus metrics endpoint with multiprocess support."""
+        from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest, multiprocess
+
+        multiproc_dir = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
+        if multiproc_dir:
+            registry = CollectorRegistry()
+            multiprocess.MultiProcessCollector(registry)
+            data = generate_latest(registry)
+        else:
+            data = generate_latest()
+
+        return Response(content=data, media_type=CONTENT_TYPE_LATEST)
 
     return app
 

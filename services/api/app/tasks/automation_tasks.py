@@ -157,6 +157,10 @@ def check_follow_up_reminders():
                     },
                 )
 
+                from app.metrics import notifications_sent_total
+
+                notifications_sent_total.labels(type="follow_up").inc()
+
             await db.commit()
 
     asyncio.run(_check())
@@ -265,6 +269,10 @@ def generate_meeting_prep_task(user_id: str, event_id: str):
                     "discussion_points": str(len(prep.key_discussion_points)),
                 },
             )
+
+            from app.metrics import notifications_sent_total
+
+            notifications_sent_total.labels(type="meeting_prep").inc()
 
             logger.info("Sent meeting prep for event %s", event_id)
 
@@ -417,6 +425,10 @@ def send_digest_notifications():
                     notification_type=NotificationType.DIGEST,
                     extra_data={"alert_count": str(len(alerts))},
                 )
+
+                from app.metrics import notifications_sent_total
+
+                notifications_sent_total.labels(type="digest").inc()
 
                 sub.last_sent_at = now
                 await db.flush()

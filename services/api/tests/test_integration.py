@@ -84,6 +84,9 @@ class TestHealthEndpoints:
     def test_metrics_endpoint(self, client):
         response = client.get("/metrics")
         assert response.status_code == 200
+        assert "text/plain" in response.headers.get("content-type", "")
+        body = response.text
+        assert "http_request_duration_seconds" in body or "http_requests" in body
 
 
 class TestCORSHeaders:

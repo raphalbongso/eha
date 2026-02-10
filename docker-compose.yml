@@ -14,6 +14,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
     depends_on:
       db:
         condition: service_healthy
@@ -27,6 +28,7 @@ services:
       start_period: 30s
     volumes:
       - ./services/api:/app
+      - prometheus_multiproc:/tmp/prometheus_multiproc
     restart: unless-stopped
 
   celery-worker:
@@ -42,6 +44,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
     depends_on:
       api:
         condition: service_healthy
@@ -49,6 +52,7 @@ services:
         condition: service_healthy
     volumes:
       - ./services/api:/app
+      - prometheus_multiproc:/tmp/prometheus_multiproc
     restart: unless-stopped
 
   celery-beat:
@@ -101,6 +105,39 @@ services:
       retries: 5
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=eha_dev
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:
+  prometheus_data:
+  grafana_data:
+  prometheus_multiproc:
