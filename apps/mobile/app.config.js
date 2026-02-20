@@ -21,6 +21,7 @@ export default {
           "EHA needs calendar access to add events detected in your emails.",
         NSCalendarsFullAccessUsageDescription:
           "EHA needs calendar access to add events detected in your emails.",
+        UIBackgroundModes: ["fetch", "remote-notification"],
       },
     },
     android: {
@@ -31,9 +32,16 @@ export default {
       package: "com.eha.app",
       permissions: ["READ_CALENDAR", "WRITE_CALENDAR"],
     },
-    plugins: ["expo-secure-store", "expo-notifications"],
+    plugins: [
+      "expo-secure-store",
+      "expo-notifications",
+      "@sentry/react-native/expo",
+      "expo-background-fetch",
+      "expo-task-manager",
+    ],
     extra: {
       apiBaseUrl: process.env.API_BASE_URL || null,
+      sentryDsn: process.env.SENTRY_DSN || null,
     },
   },
 };

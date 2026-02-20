@@ -48,10 +48,10 @@
 - [x] User preference for AI data retention
 
 ### Platform
-- [ ] Prometheus + Grafana metrics dashboard
-- [ ] Sentry error tracking integration
-- [ ] WebSocket for real-time alert updates
-- [ ] Background app refresh for iOS
+- [x] Prometheus + Grafana metrics dashboard
+- [x] Sentry error tracking integration
+- [x] WebSocket for real-time alert updates
+- [x] Background app refresh for iOS
 
 ---
 

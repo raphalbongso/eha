@@ -16,7 +16,7 @@ from app.dependencies import get_session_factory, init_db, shutdown_db
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.logging import LoggingMiddleware, setup_logging
 from app.middleware.rate_limit import RateLimitMiddleware
-from app.routers import admin, ai, alerts, auth, automation, devices, drafts, events, gmail, preferences, rules, slack
+from app.routers import admin, ai, alerts, auth, automation, devices, drafts, events, gmail, preferences, rules, slack, ws
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +31,50 @@ async def lifespan(app: FastAPI):
     # Initialize database
     init_db(settings)
 
+    # Start WebSocket manager (Redis pub/sub listener)
+    from app.services.ws_manager import ws_manager
+
+    await ws_manager.start()
+
     yield
 
     # Shutdown
+    await ws_manager.stop()
     await shutdown_db()
     logger.info("EHA API shutting down")
+
+
+def _init_sentry(settings: Settings) -> None:
+    """Initialize Sentry if a DSN is configured."""
+    dsn = settings.sentry_dsn.get_secret_value()
+    if not dsn:
+        return
+
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+    sentry_sdk.init(
+        dsn=dsn,
+        environment=settings.app_env,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        send_default_pii=False,
+        integrations=[
+            FastApiIntegration(),
+            SqlalchemyIntegration(),
+            CeleryIntegration(),
+        ],
+    )
+    logger.info("Sentry initialized (env=%s)", settings.app_env)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Create and configure the FastAPI application."""
     if settings is None:
         settings = get_settings()
+
+    _init_sentry(settings)
 
     app = FastAPI(
         title="EHA - Email Helper Agent",
@@ -82,6 +115,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(automation.router, prefix=prefix)
     app.include_router(slack.router, prefix=prefix)
     app.include_router(admin.router, prefix=prefix)
+    app.include_router(ws.router)
 
     @app.get("/")
     async def root():

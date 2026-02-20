@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     # Google Maps (v2)
     google_maps_api_key: SecretStr = SecretStr("")
 
+    # Sentry
+    sentry_dsn: SecretStr = SecretStr("")
+    sentry_traces_sample_rate: float = 0.1
+
     @field_validator("allowed_origins")
     @classmethod
     def parse_origins(cls, v: str) -> str:

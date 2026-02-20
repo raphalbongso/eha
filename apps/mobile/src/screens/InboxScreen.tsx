@@ -15,13 +15,33 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { Alert, RootStackParamList } from '../types';
 import { AlertCard } from '../components/AlertCard';
 import { useAlerts } from '../hooks/useAlerts';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 export function InboxScreen() {
   const navigation = useNavigation<NavProp>();
-  const { alerts, isLoading, fetchAlerts, markAsRead, unreadCount } =
+  const { alerts, isLoading, fetchAlerts, markAsRead, addAlert, unreadCount } =
     useAlerts();
+
+  useWebSocket({
+    onNewAlert: useCallback(
+      (payload: Record<string, unknown>) => {
+        addAlert({
+          id: (payload.alert_id as string) ?? Date.now().toString(),
+          message_id: (payload.message_id as string) ?? '',
+          rule_id: null,
+          rule_name: (payload.rule_name as string) ?? null,
+          read: false,
+          created_at: new Date().toISOString(),
+          subject: (payload.subject as string) ?? null,
+          from_addr: (payload.from_addr as string) ?? null,
+          snippet: null,
+        });
+      },
+      [addAlert],
+    ),
+  });
 
   const handleAlertPress = useCallback(
     (alert: Alert) => {

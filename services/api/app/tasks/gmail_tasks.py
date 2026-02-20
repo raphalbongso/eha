@@ -289,6 +289,7 @@ def _process_single_message(
                 subject=parsed.subject or "(no subject)",
                 from_addr=parsed.from_addr or "unknown",
                 rule_name=rule_dict["name"],
+                message_id=parsed.message_id,
             )
 
     session.commit()

@@ -66,9 +66,18 @@ export function useAlerts(unreadOnly: boolean = false) {
     [],
   );
 
+  const addAlert = useCallback((alert: Alert) => {
+    setState((prev) => ({
+      ...prev,
+      alerts: [alert, ...prev.alerts],
+      unreadCount: prev.unreadCount + 1,
+    }));
+  }, []);
+
   return {
     ...state,
     fetchAlerts,
     markAsRead,
+    addAlert,
   };
 }

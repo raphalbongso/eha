@@ -3,7 +3,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { Text } from 'react-native';
 
 import type { MainTabParamList, RootStackParamList } from '../types';
@@ -14,6 +14,8 @@ import { RulesScreen } from '../screens/RulesScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { EmailDetailScreen } from '../screens/EmailDetailScreen';
 import { ProposedEventScreen } from '../screens/ProposedEventScreen';
+
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -71,7 +73,7 @@ export function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         screenOptions={{
           headerStyle: { backgroundColor: '#1a1a2e' },

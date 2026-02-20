@@ -48,6 +48,7 @@ def send_push_for_alert(
     subject: str,
     from_addr: str,
     rule_name: str,
+    message_id: str | None = None,
 ):
     """Send notifications (push + Slack) for a rule match alert."""
     import uuid
@@ -80,6 +81,20 @@ def send_push_for_alert(
             await db.commit()
 
     asyncio.run(_send())
+
+    # Broadcast to WebSocket clients via Redis
+    from app.services.ws_manager import publish_alert_sync
+
+    ws_payload: dict = {
+        "type": "new_alert",
+        "alert_id": alert_id,
+        "subject": subject,
+        "from_addr": from_addr,
+        "rule_name": rule_name,
+    }
+    if message_id:
+        ws_payload["message_id"] = message_id
+    publish_alert_sync(user_id=user_id, payload=ws_payload)
 
 
 @shared_task(

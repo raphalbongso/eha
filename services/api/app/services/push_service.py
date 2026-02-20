@@ -100,7 +100,10 @@ class PushService:
             request = NotificationRequest(
                 device_token=token,
                 message={
-                    "aps": {"alert": {"title": title, "body": body}},
+                    "aps": {
+                        "alert": {"title": title, "body": body},
+                        "content-available": 1,
+                    },
                     **(data or {}),
                 },
             )

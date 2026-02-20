@@ -3,7 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -65,6 +65,21 @@ async def list_alerts(
             )
         )
     return responses
+
+
+@router.get("/count")
+async def alert_count(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the number of unread alerts for the current user."""
+    result = await db.execute(
+        select(func.count()).select_from(Alert).where(
+            Alert.user_id == user_id,
+            Alert.read == False,  # noqa: E712
+        )
+    )
+    return {"unread_count": result.scalar_one()}
 
 
 @router.post("/mark-read")
